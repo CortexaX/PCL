@@ -987,7 +987,7 @@ NextFile:
     Public Sub Telemetry([Event] As String, ParamArray Datas As String())
         If BuildType = BuildTypes.Debug Then Return '开发版不上传遥测
         If Not Settings.Get(Of Boolean)("SystemSystemTelemetry") Then Return '用户关闭了遥测
-        If Not ClsBaseUrl.StartsWithF("http") Then Return '开源版没有设置遥测地址
+        If Not ClsBaseUrl.StartsWithF("http") Then Return '未配置遥测地址
         RunInNewThread(
         Sub()
             Try

@@ -426,9 +426,6 @@ Public Class PageLinkMain
     '1. 获取服务器配置
     Private Sub InitConfig(Task As LoaderTask(Of Integer, Integer))
         UpdateLoadingPage("正在联网获取配置……", "联网获取配置")
-        If VersionBranchMain <> "Official" Then
-            Throw New Exception($"$开源版无法联网获取配置。{vbCrLf}你可以在 PCL 官方版的缓存文件夹下查看 ServerConfig 的当前内容， 并在代码中进行相应修改。")
-        End If
         ServerLoader.WaitForExit(LoaderToSyncProgress:=Task)
         If ServerConfig Is Nothing Then Throw New Exception("无法从服务器获取配置")
         '检查是否已禁用联机功能
