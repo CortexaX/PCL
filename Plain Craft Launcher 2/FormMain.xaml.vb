@@ -847,7 +847,6 @@ Public Class FormMain
             Logger.Error(ex, "切回窗口时出错")
         End Try
         '读取剪贴板，自动加入联机房间
-        Return 'TODO: 联机复活赛
         If PageLinkMain.LinkState <> PageLinkMain.LinkStates.Waiting Then Return '已启动联机
         If PageCurrent = PageType.Link Then Return '已在联机界面
         Dim Code = ClipboardGetText() : If Code Is Nothing Then Return '剪贴板无文本
