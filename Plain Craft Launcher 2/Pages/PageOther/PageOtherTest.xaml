@@ -1,12 +1,85 @@
 <local:MyPageRight x:Class="PageOtherTest"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="clr-namespace:PCL"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    mc:Ignorable="d"
     PanScroll="PanBack">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
-        <TextBlock Text="为便于维护，开源内容中不包含百宝箱功能……" HorizontalAlignment="Center" FontSize="15" Height="30" VerticalAlignment="Center" />
+        <StackPanel Margin="25,25,25,10">
+            <local:MyCard Title="百宝箱" Margin="0,0,0,15">
+                <StackPanel Orientation="Horizontal" Margin="25,42,6,10">
+                    <local:MyButton x:Name="BtnJrrp" Text="今日人品" Margin="0,0,15,12" MinWidth="95" />
+                    <local:MyButton x:Name="BtnMemory" Text="内存优化" Margin="0,0,15,12" MinWidth="95"
+                                    ToolTip="尝试释放系统缓存内存。&#xa;也可用 --memory 参数启动 PCL 来静默执行。" />
+                    <local:MyButton x:Name="BtnClear" Text="清理垃圾" Margin="0,0,15,12" MinWidth="95"
+                                    ToolTip="清理 PCL 缓存、MC 日志、崩溃报告和临时 natives 文件。" />
+                    <local:MyButton x:Name="BtnClick" Text="千万别点" Margin="0,0,15,12" MinWidth="95" ColorType="Red" />
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard x:Name="CardCave" Title="回声洞" Margin="0,0,0,15">
+                <Grid>
+                    <TextBlock x:Name="LabCave" Margin="25,39,25,16" FontSize="13.5" IsHitTestVisible="False"
+                               TextWrapping="Wrap" Foreground="{DynamicResource ColorBrush1}"
+                               Text="再次点击这里以查看更多的 PCL 作者和各位沙雕网友乱七八糟的留言！" />
+                    <local:MyTextButton x:Name="BtnCave" Text="投稿" Margin="10,7" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                </Grid>
+            </local:MyCard>
+
+            <local:MyCard Title="自定义下载" Margin="0,0,0,15">
+                <Grid Margin="25,38,25,21" Grid.IsSharedSizeScope="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="11" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="11" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="下载链接" VerticalAlignment="Top" Margin="0,6,25,0" />
+                    <local:MyTextBox x:Name="TextDownloadUrl" Grid.Column="1" Grid.ColumnSpan="2" HintText="https://..." MinHeight="28">
+                        <local:MyTextBox.ValidateRules>
+                            <local:ValidateExcept ErrorMessage="输入的网址不能使用 % 协议！">
+                                <local:ValidateExcept.Excepts>
+                                    <sys:String>ftp://</sys:String>
+                                </local:ValidateExcept.Excepts>
+                            </local:ValidateExcept>
+                            <local:ValidateHttp />
+                        </local:MyTextBox.ValidateRules>
+                    </local:MyTextBox>
+
+                    <TextBlock Grid.Row="2" Text="目标文件夹" VerticalAlignment="Top" Margin="0,6,25,0" />
+                    <local:MyTextBox x:Name="TextDownloadFolder" Grid.Row="2" Grid.Column="1" HintText="选择下载保存目录..." MinHeight="28">
+                        <local:MyTextBox.ValidateRules>
+                            <local:ValidateFolderPath UseMinecraftCharCheck="False" />
+                        </local:MyTextBox.ValidateRules>
+                    </local:MyTextBox>
+                    <local:MyTextButton x:Name="BtnDownloadSelect" Grid.Row="2" Grid.Column="2" Text="选择" Margin="10,7,-8,0"
+                                        HorizontalAlignment="Center" VerticalAlignment="Top" />
+
+                    <TextBlock Grid.Row="4" Text="文件名" VerticalAlignment="Top" Margin="0,6,25,0" />
+                    <local:MyTextBox x:Name="TextDownloadName" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" HintText="保存的文件名..." MinHeight="28">
+                        <local:MyTextBox.ValidateRules>
+                            <local:ValidateFileName UseMinecraftCharCheck="False" RequireParentFolderExists="False" />
+                        </local:MyTextBox.ValidateRules>
+                    </local:MyTextBox>
+
+                    <StackPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                        <local:MyButton x:Name="BtnDownloadStart" Text="开始下载" Height="35" MinWidth="140" Padding="13,0" Margin="0,8,8,0" ColorType="Highlight" IsEnabled="False" />
+                        <local:MyButton x:Name="BtnDownloadOpen" Text="打开文件夹" Height="35" MinWidth="140" Padding="13,0" Margin="8,8,8,0" IsEnabled="False" />
+                    </StackPanel>
+                </Grid>
+            </local:MyCard>
+        </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>
