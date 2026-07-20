@@ -49,7 +49,7 @@ Public Class PageOtherTest
         StartButtonRefresh()
     End Sub
 
-    Private Sub TextDownloadGlobalValidateChanged(sender As Object, e As EventArgs) Handles MyTextBox.ValidateChanged
+    Private Sub TextDownloadGlobalValidateChanged(sender As Object, e As EventArgs) Handles TextDownloadUrl.ValidateChanged, TextDownloadFolder.ValidateChanged, TextDownloadName.ValidateChanged
         If BtnDownloadStart Is Nothing OrElse BtnDownloadOpen Is Nothing Then Return
         If sender Is TextDownloadUrl OrElse sender Is TextDownloadFolder OrElse sender Is TextDownloadName Then StartButtonRefresh()
     End Sub
