@@ -40,9 +40,18 @@ Public Class PageOtherTest
         TextDownloadName.Validate()
     End Sub
 
-    Private Sub StartButtonRefresh() Handles TextDownloadUrl.ValidatedTextChanged, TextDownloadFolder.ValidatedTextChanged, TextDownloadName.ValidatedTextChanged
+    Private Sub StartButtonRefresh()
         BtnDownloadStart.IsEnabled = TextDownloadFolder.IsValidated AndAlso TextDownloadUrl.IsValidated AndAlso TextDownloadName.IsValidated
         BtnDownloadOpen.IsEnabled = TextDownloadFolder.IsValidated
+    End Sub
+
+    Private Sub TextDownloadValidatedTextChanged() Handles TextDownloadUrl.ValidatedTextChanged, TextDownloadFolder.ValidatedTextChanged, TextDownloadName.ValidatedTextChanged
+        StartButtonRefresh()
+    End Sub
+
+    Private Sub TextDownloadGlobalValidateChanged(sender As Object, e As EventArgs) Handles MyTextBox.ValidateChanged
+        If BtnDownloadStart Is Nothing OrElse BtnDownloadOpen Is Nothing Then Return
+        If sender Is TextDownloadUrl OrElse sender Is TextDownloadFolder OrElse sender Is TextDownloadName Then StartButtonRefresh()
     End Sub
 
     Private Sub TextDownloadUrl_KeyDown(sender As Object, e As KeyEventArgs) Handles TextDownloadUrl.KeyDown, TextDownloadFolder.KeyDown, TextDownloadName.KeyDown
