@@ -39,3 +39,12 @@ The Terracotta source splits the behavior into these main areas:
 
 When the .NET port is complete, PCL2 should call the internal implementation
 directly instead of starting `terracotta.exe --hmcl`.
+
+## .NET port progress
+
+- `Plain Craft Launcher 2/Modules/ModTaowaCore.vb` ports the room code
+  generation/parsing, profile model, app-state JSON shape, scaffolding packet
+  framing, and Minecraft LAN scanner from the Rust source.
+- `Plain Craft Launcher 2/Modules/ModTaowa.vb` still uses the transitional
+  `terracotta.exe --hmcl` backend until the EasyTier control and scaffolding
+  session loops have also been ported.

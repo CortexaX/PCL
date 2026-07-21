@@ -256,6 +256,7 @@
     <Compile Include="Modules\ModMusic.vb" />
     <Compile Include="Modules\ModDevelop.vb" />
     <Compile Include="Modules\ModTaowa.vb" />
+    <Compile Include="Modules\ModTaowaCore.vb" />
     <Compile Include="Modules\Minecraft\ModWatcher.vb" />
     <Compile Include="Modules\ModSecret.vb" />
     <Compile Include="Pages\PageDownload\Resource\PageResource.xaml.vb">
