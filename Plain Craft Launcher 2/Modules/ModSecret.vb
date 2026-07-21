@@ -71,15 +71,99 @@ Friend Module ModSecret
     Public ThemeNow As Integer = -1
     Public ColorHue As Integer = 210, ColorSat As Integer = 85, ColorLightAdjust As Integer = 0, ColorHueTopbarDelta As OneOf(Of Integer, Integer()) = 0
     Public ThemeDontClick As Integer = 0
+    Private ThemeRainbowInitialized As Boolean = False
+    Private ThemeRainbowHueDelta As Integer = 1
     Public Sub ThemeRefresh(Optional NewTheme As Integer = -1)
         Try
             If ThemeNow = NewTheme AndAlso NewTheme >= 0 Then Return
             If Not ThemeCheckOne(If(NewTheme >= 0, NewTheme, If(ThemeNow >= 0, ThemeNow, 0))) Then Return
             If NewTheme >= 0 Then ThemeNow = NewTheme
 
-            ColorHue = 210
-            ColorSat = 85
-            ColorLightAdjust = 0
+            Dim CurrentTheme = If(ThemeNow >= 0, ThemeNow, 0)
+            ColorHueTopbarDelta = 0
+            Select Case CurrentTheme
+                Case 0
+                    ColorHue = 210
+                    ColorSat = 85
+                    ColorLightAdjust = 0
+                Case 1
+                    ColorHue = 180
+                    ColorSat = 60
+                    ColorLightAdjust = 0
+                Case 2
+                    ColorHue = 130
+                    ColorSat = 50
+                    ColorLightAdjust = 0
+                    ColorHueTopbarDelta = New Integer() {5, -5, 5}
+                Case 3
+                    ColorHue = 60
+                    ColorSat = 65
+                    ColorLightAdjust = 0
+                    ColorHueTopbarDelta = New Integer() {-5, 10, -5}
+                Case 4
+                    ColorHue = 20
+                    ColorSat = 50
+                    ColorLightAdjust = -5
+                    ColorHueTopbarDelta = New Integer() {-5, 10, -5}
+                Case 5
+                    ColorHue = 225
+                    ColorSat = 10
+                    ColorLightAdjust = -20
+                Case 6
+                    ColorHue = 345
+                    ColorSat = 95
+                    ColorLightAdjust = 15
+                Case 7
+                    ColorHue = 270
+                    ColorSat = 70
+                    ColorLightAdjust = -5
+                    ColorHueTopbarDelta = New Integer() {15, 0, 15}
+                Case 8
+                    ColorHue = 50
+                    ColorSat = 80
+                    ColorLightAdjust = 5
+                Case 9
+                    ColorHue = 25
+                    ColorSat = 90
+                    ColorLightAdjust = 5
+                Case 10
+                    ColorHue = 0
+                    ColorSat = 80
+                    ColorLightAdjust = 0
+                    ColorHueTopbarDelta = New Integer() {-10, 10, -10}
+                Case 11
+                    ColorHue = 230
+                    ColorSat = 70
+                    ColorLightAdjust = -10
+                    ColorHueTopbarDelta = New Integer() {-10, 10, -10}
+                Case 12
+                    If Not ThemeRainbowInitialized Then
+                        ThemeRainbowInitialized = True
+                        ColorHue = RandomInteger(0, 359)
+                        ThemeRainbowHueDelta = (RandomInteger(0, 1) * 2 - 1) * 3
+                    End If
+                    ColorHue = (ColorHue + ThemeRainbowHueDelta + 360) Mod 360
+                    ColorSat = 65
+                    ColorLightAdjust = 0
+                Case 13
+                    ColorHue = 325
+                    ColorSat = 90
+                    ColorLightAdjust = 0
+                    ColorHueTopbarDelta = New Integer() {-10, 0, 15}
+                Case 14
+                    ColorHue = Settings.Get(Of Integer)("UiLauncherHue")
+                    ColorSat = Settings.Get(Of Integer)("UiLauncherSat")
+                    ColorLightAdjust = Settings.Get(Of Integer)("UiLauncherLight") - 20
+                    ColorHueTopbarDelta = Settings.Get(Of Integer)("UiLauncherDelta") - 90
+                Case 42
+                    ColorHue = 225
+                    ColorSat = 60
+                    ColorLightAdjust = -25
+                Case Else
+                    ColorHue = 215
+                    ColorSat = 90
+                    ColorLightAdjust = 0
+            End Select
             Select Case ThemeDontClick
                 Case 1
                     ColorLightAdjust = 999
@@ -155,9 +239,9 @@ Friend Module ModSecret
             '主页面背景
             If Settings.Get(Of Boolean)("UiBackgroundColorful") Then
                 Brush = New LinearGradientBrush With {.EndPoint = New Point(0.1, 1), .StartPoint = New Point(0.9, 0)}
-                Brush.GradientStops.Add(New GradientStop With {.Offset = -0.1, .Color = New MyColor().FromHSL2(ColorHue - 15, ColorSat * 0.8, 91)})
-                Brush.GradientStops.Add(New GradientStop With {.Offset = 0.4, .Color = New MyColor().FromHSL2(ColorHue, ColorSat * 0.8, 91)})
-                Brush.GradientStops.Add(New GradientStop With {.Offset = 1.1, .Color = New MyColor().FromHSL2(ColorHue + 15, ColorSat * 0.8, 91)})
+                Brush.GradientStops.Add(New GradientStop With {.Offset = -0.1, .Color = New MyColor().FromHSL2(ColorHue - 20, Math.Min(60, ColorSat) * 0.5, 80)})
+                Brush.GradientStops.Add(New GradientStop With {.Offset = 0.4, .Color = New MyColor().FromHSL2(ColorHue, ColorSat * 0.9, 90)})
+                Brush.GradientStops.Add(New GradientStop With {.Offset = 1.1, .Color = New MyColor().FromHSL2(ColorHue + 20, Math.Min(60, ColorSat) * 0.5, 80)})
                 FrmMain.PanForm.Background = Brush
             Else
                 FrmMain.PanForm.Background = New MyColor(245, 245, 245)
