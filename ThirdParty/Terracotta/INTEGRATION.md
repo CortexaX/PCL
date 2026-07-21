@@ -46,6 +46,9 @@ directly instead of starting `terracotta.exe --hmcl`.
   generation/parsing, profile model, app-state JSON shape, scaffolding packet
   framing, TCP client/server session layer, default `c:*` protocol handlers,
   and Minecraft LAN scanner from the Rust source.
+- `Plain Craft Launcher 2/Modules/ModTaowaEasyTier.vb` ports EasyTier argument
+  construction, NAT/difficulty mapping, local port allocation, process startup,
+  CLI peer parsing, and port-forward control scaffolding from the Rust source.
 - `Plain Craft Launcher 2/Modules/ModTaowa.vb` still uses the transitional
   `terracotta.exe --hmcl` backend until the EasyTier control and scaffolding
   session loops have also been ported.
