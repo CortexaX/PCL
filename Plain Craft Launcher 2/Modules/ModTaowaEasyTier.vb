@@ -129,24 +129,34 @@ Public Module Pcl2TaowaEasyTier
     End Function
 
     Public Function RequestSpecificPort(Port As Integer) As Integer?
+        Dim Listener As TcpListener = Nothing
         Try
-            Using Listener As New TcpListener(IPAddress.Loopback, Port)
-                Listener.Start()
-                Return DirectCast(Listener.LocalEndpoint, IPEndPoint).Port
-            End Using
+            Listener = New TcpListener(IPAddress.Loopback, Port)
+            Listener.Start()
+            Return DirectCast(Listener.LocalEndpoint, IPEndPoint).Port
         Catch
             Return Nothing
+        Finally
+            Try
+                If Listener IsNot Nothing Then Listener.Stop()
+            Catch
+            End Try
         End Try
     End Function
 
     Public Function RequestPort(Kind As TaowaPortRequest) As Integer
+        Dim Listener As TcpListener = Nothing
         Try
-            Using Listener As New TcpListener(IPAddress.Loopback, 0)
-                Listener.Start()
-                Return DirectCast(Listener.LocalEndpoint, IPEndPoint).Port
-            End Using
+            Listener = New TcpListener(IPAddress.Loopback, 0)
+            Listener.Start()
+            Return DirectCast(Listener.LocalEndpoint, IPEndPoint).Port
         Catch
             Return 35780 + CInt(Kind)
+        Finally
+            Try
+                If Listener IsNot Nothing Then Listener.Stop()
+            Catch
+            End Try
         End Try
     End Function
 
