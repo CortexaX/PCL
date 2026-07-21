@@ -20,6 +20,8 @@
 
 - `main`：当前继续维护的完全开源正式分支，最新正式发布为 [v2.13.0.1-cortexa.2](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-cortexa.2)。这一版默认使用内部 VB/.NET Taowa 联机实现，构建产物不再包含 `terracotta.exe` 与 `VCRUNTIME140.DLL`。
 - `reference/v2.13.0.1-cortexa.1`：旧正式版参考分支，对应 [v2.13.0.1-cortexa.1](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-cortexa.1) 与提交 `d58a27b0e28704b132c3740590a6bad2b78c3eee`。这个分支保留给需要对照旧正式版恢复过程、行为差异或迁移改动的人参考。
+- `reference/v2.13.0.1-taowa-test.1`：Taowa 测试版参考分支，对应 [v2.13.0.1-taowa-test.1](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-taowa-test.1) 与提交 `543ad27bc262651becda51029af29958908af3b1`。
+- `reference/v2.13.0.1-taowa-test.2`：Taowa 测试版 source.2 参考分支，对应 [v2.13.0.1-taowa-test.2](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-taowa-test.2) 与提交 `d08a4f6ccb300e996c3195f3fe196b45bdf4594a`。这两个测试版分支用于对照原测试版联机恢复逻辑和后续内部化迁移差异。
 
 ## 构建
 
