@@ -255,6 +255,7 @@
     <Compile Include="Modules\Minecraft\ModCrash.vb" />
     <Compile Include="Modules\ModMusic.vb" />
     <Compile Include="Modules\ModDevelop.vb" />
+    <Compile Include="Modules\ModTaowa.vb" />
     <Compile Include="Modules\Minecraft\ModWatcher.vb" />
     <Compile Include="Modules\ModSecret.vb" />
     <Compile Include="Pages\PageDownload\Resource\PageResource.xaml.vb">
@@ -910,6 +911,16 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\lwjgl-unsafe-agent.jar" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Taowa\terracotta.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>terracotta.exe</TargetPath>
+    </None>
+    <None Include="Resources\Taowa\VCRUNTIME140.DLL">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>VCRUNTIME140.DLL</TargetPath>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MeloongCore\Shared\MeloongCore.csproj">

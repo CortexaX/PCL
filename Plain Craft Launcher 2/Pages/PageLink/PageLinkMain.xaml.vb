@@ -93,6 +93,9 @@ Public Class PageLinkMain
 
     '创建
     Private Sub Create_MouseLeftButtonUp() Handles PanSelectCreate.MouseLeftButtonUp
+        Pcl2Taowa.Host("Player")
+        Return
+
         '输入端口号
         Dim Port As String = MyMsgBoxInput("输入端口", $"在单人游戏的暂停菜单选择 {vbLQ}对局域网开放{vbRQ}，然后输入端口数字。{vbCrLf}甚至可以输入其他游戏的端口……嗯……",
             ValidateRules:=New Collection(Of Validate) From {New ValidateInteger(1024, 65535)},
@@ -188,6 +191,9 @@ Public Class PageLinkMain
     ''' 切换到联机页并立即加入指定房间。
     ''' </summary>
     Public Shared Sub Join(Code As String)
+        Pcl2Taowa.Join(Code, "Player")
+        Return
+
         If LinkState <> LinkStates.Waiting Then
             Hint("你已经在联机房间中了！", HintType.Red)
         ElseIf FrmMain.PageCurrent = FormMain.PageType.Link Then
@@ -425,6 +431,9 @@ Public Class PageLinkMain
 
     '1. 获取服务器配置
     Private Sub InitConfig(Task As LoaderTask(Of Integer, Integer))
+        Pcl2Taowa.EnsureStarted()
+        Return
+
         UpdateLoadingPage("正在联网获取配置……", "联网获取配置")
         ServerLoader.WaitForExit(LoaderToSyncProgress:=Task)
         If ServerConfig Is Nothing Then Throw New Exception("无法从服务器获取配置")
@@ -440,6 +449,10 @@ Public Class PageLinkMain
     '2. 获取需要下载的文件
     Private ServerVersion As Integer
     Private Sub InitPrepareDownload(Task As LoaderTask(Of Integer, List(Of NetFile)))
+        Pcl2Taowa.EnsureStarted()
+        Task.Output = New List(Of NetFile)
+        Return
+
         '获取 CPU 架构
         UpdateLoadingPage("正在获取 CPU 架构……", "获取 CPU 架构")
         Dim Architecture As String = GetType(String).Assembly.GetName().ProcessorArchitecture
@@ -479,6 +492,9 @@ Public Class PageLinkMain
 
     '3. 启动联机模块
     Private Sub InitLaunch(Task As LoaderTask(Of Integer, Integer))
+        Pcl2Taowa.EnsureStarted()
+        Return
+
         '解压文件
         UpdateLoadingPage("正在解压联机模块……", "解压联机模块")
         If FileUtils.Exists(PathEasyTier & "EasyTier.zip") Then
@@ -706,6 +722,7 @@ ForcedPass:
     ''' </summary>
     Public Shared Sub ProcessStop()
         Try
+            Pcl2Taowa.Stop()
             '关闭未捕获的进程
             For Each ProcessObject In Process.GetProcesses
                 If ProcessObject.Id = ProcessCore?.Id Then Continue For
