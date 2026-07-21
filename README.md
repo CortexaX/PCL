@@ -1,5 +1,7 @@
 # Plain Craft Launcher 2 完全开源版
 
+> 这是 `reference/v2.13.0.1-taowa-test.2` 参考分支，对应 Taowa 测试发布 [v2.13.0.1-taowa-test.2](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-taowa-test.2) 与提交 `d08a4f6ccb300e996c3195f3fe196b45bdf4594a`。此分支用于对照 source.2 测试联机恢复状态；当前维护分支请看 [`main`](https://github.com/CortexaX/PCL/tree/main)。
+
 [![Build](https://github.com/CortexaX/PCL/actions/workflows/build.yml/badge.svg)](https://github.com/CortexaX/PCL/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/CortexaX/PCL?label=Release)](https://github.com/CortexaX/PCL/releases)
 [![Stars](https://img.shields.io/github/stars/CortexaX/PCL?style=flat&label=Stars)](https://github.com/CortexaX/PCL)
@@ -15,6 +17,10 @@
 - 发布公开：发布页提供可直接下载的构建包与校验信息。
 - 本地恢复：已恢复主题解锁、主题调色逻辑与 Taowa/Terracotta 测试联机逻辑。
 - 联机源码：Terracotta v0.4.2 源码已作为第三方源码包放入 [ThirdParty/Terracotta](ThirdParty/Terracotta)，当前 `terracotta.exe` 仅作为过渡后端保留。
+
+## 参考分支说明
+
+这个分支保留的是 Taowa 测试版 source.2 发布时的源码快照，适合用来查看测试联机逻辑公开与迁移前后的状态。第一版测试状态见 [`reference/v2.13.0.1-taowa-test.1`](https://github.com/CortexaX/PCL/tree/reference/v2.13.0.1-taowa-test.1)，当前已移除 `terracotta.exe` 独立进程后端的正式维护状态见 [`main`](https://github.com/CortexaX/PCL/tree/main)。
 
 ## 构建
 
