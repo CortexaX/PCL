@@ -6,6 +6,7 @@ Public Module Pcl2TaowaCore
 
     Private Const TerracottaVersion As String = "0.4.2"
     Private Const EasyTierVersion As String = "v2.5.0-terracotta.2"
+    Public Const ScaffoldingDefaultPort As Integer = 13448
     Private Const RoomCodeLength As Integer = 21
     Private ReadOnly RoomChars As Char() = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ".ToCharArray()
     Private ReadOnly RoomValueLimit As BigInteger = BigInteger.Pow(New BigInteger(34), 16)
@@ -181,8 +182,7 @@ Public Module Pcl2TaowaCore
 
     Public Sub IncreaseShared()
         SyncLock StateLock
-            CurrentStateIndex += 1
-            CurrentSharingIndex += 1
+            IncreaseSharedLocked()
         End SyncLock
     End Sub
 
@@ -204,6 +204,12 @@ Public Module Pcl2TaowaCore
         If Capture Is Nothing Then Return False
         Return CurrentStateIndex - CurrentSharingIndex <= Capture.Index
     End Function
+
+    Private Sub IncreaseSharedLocked()
+        CurrentStateIndex += 1
+        CurrentSharingIndex += 1
+        Log("TaowaCore shared -> " & CurrentState.Kind.ToString())
+    End Sub
 
 #End Region
 
@@ -291,12 +297,120 @@ Public Module Pcl2TaowaCore
         Return New TaowaPacketResponse(Status, Body)
     End Function
 
+    Public Function CreateScaffoldingResponse(Status As Byte, Body As Byte()) As Byte()
+        If Body Is Nothing Then Body = New Byte() {}
+
+        Dim Result As New List(Of Byte)(5 + Body.Length)
+        Result.Add(Status)
+        AddUInt32BigEndian(Result, CUInt(Body.Length))
+        Result.AddRange(Body)
+        Return Result.ToArray()
+    End Function
+
+    Public Function CreateDefaultScaffoldingHandlers() As List(Of TaowaScaffoldingHandlerEntry)
+        Dim Entries As New List(Of TaowaScaffoldingHandlerEntry)
+        Entries.Add(New TaowaScaffoldingHandlerEntry("c", "ping",
+            Function(Request As Byte()) As TaowaPacketResponse
+                Return TaowaPacketResponse.Ok(Request)
+            End Function))
+        Entries.Add(New TaowaScaffoldingHandlerEntry("c", "protocols",
+            Function(Request As Byte()) As TaowaPacketResponse
+                Dim Names = Entries.Select(Function(Entry) Entry.NamespaceName & ":" & Entry.PathName).ToArray()
+                Return TaowaPacketResponse.Ok(Encoding.UTF8.GetBytes(String.Join(New String(ChrW(0), 1), Names)))
+            End Function))
+        Entries.Add(New TaowaScaffoldingHandlerEntry("c", "server_port", AddressOf HandleScaffoldingServerPort))
+        Entries.Add(New TaowaScaffoldingHandlerEntry("c", "player_ping", AddressOf HandleScaffoldingPlayerPing))
+        Entries.Add(New TaowaScaffoldingHandlerEntry("c", "player_profiles_list", AddressOf HandleScaffoldingPlayerProfilesList))
+        Return Entries
+    End Function
+
     Private Sub AddUInt32BigEndian(Target As List(Of Byte), Value As UInteger)
         Target.Add(CByte((Value >> 24) And &HFFUI))
         Target.Add(CByte((Value >> 16) And &HFFUI))
         Target.Add(CByte((Value >> 8) And &HFFUI))
         Target.Add(CByte(Value And &HFFUI))
     End Sub
+
+    Private Function HandleScaffoldingServerPort(Request As Byte()) As TaowaPacketResponse
+        SyncLock StateLock
+            If CurrentState.Kind <> TaowaAppStateKind.HostOk OrElse CurrentState.Port <= 0 OrElse CurrentState.Port > 65535 Then
+                Return TaowaPacketResponse.Fail(32)
+            End If
+            Return TaowaPacketResponse.Ok(New Byte() {
+                CByte((CurrentState.Port >> 8) And &HFF),
+                CByte(CurrentState.Port And &HFF)})
+        End SyncLock
+    End Function
+
+    Private Function HandleScaffoldingPlayerPing(Request As Byte()) As TaowaPacketResponse
+        Dim Root = JObject.Parse(Encoding.UTF8.GetString(If(Request, New Byte() {})))
+        Dim Name = ReadRequiredString(Root, "name")
+        Dim MachineId = ReadRequiredString(Root, "machine_id")
+        Dim Vendor = ReadRequiredString(Root, "vendor")
+
+        SyncLock StateLock
+            If CurrentState.Kind <> TaowaAppStateKind.HostOk Then Throw New InvalidOperationException("IllegalStateException: Expecting HostOk.")
+            If CurrentState.HostProfiles Is Nothing Then CurrentState.HostProfiles = New List(Of TaowaTimedProfile)
+
+            Dim Profiles = CurrentState.HostProfiles
+            Dim ExistingIndex = -1
+            For i = 0 To Profiles.Count - 1
+                If String.Equals(Profiles(i).Profile.MachineId, MachineId, StringComparison.Ordinal) Then
+                    ExistingIndex = i
+                    Exit For
+                End If
+            Next
+
+            If ExistingIndex = 0 Then
+                Throw New InvalidOperationException("IllegalStateException: Cannot modify host, machine_id may conflict.")
+            ElseIf ExistingIndex > 0 Then
+                Profiles(ExistingIndex).UpdatedAt = Date.UtcNow
+                If Not String.Equals(Profiles(ExistingIndex).Profile.Name, Name, StringComparison.Ordinal) Then
+                    Profiles(ExistingIndex).Profile.Name = Name
+                    IncreaseSharedLocked()
+                End If
+            Else
+                Profiles.Add(New TaowaTimedProfile(New TaowaProfile(MachineId, Name, Vendor, TaowaProfileKind.GUEST)))
+                IncreaseSharedLocked()
+            End If
+        End SyncLock
+
+        Return TaowaPacketResponse.Ok()
+    End Function
+
+    Private Function HandleScaffoldingPlayerProfilesList(Request As Byte()) As TaowaPacketResponse
+        SyncLock StateLock
+            If CurrentState.Kind <> TaowaAppStateKind.HostOk Then Throw New InvalidOperationException("IllegalStateException: Expecting HostOk.")
+            If CurrentState.HostProfiles Is Nothing Then CurrentState.HostProfiles = New List(Of TaowaTimedProfile)
+            If PruneHostProfilesLocked() Then IncreaseSharedLocked()
+
+            Dim Profiles As New JArray
+            For Each Entry In CurrentState.HostProfiles
+                Profiles.Add(Entry.Profile.ToJson())
+            Next
+            Return TaowaPacketResponse.Ok(Encoding.UTF8.GetBytes(Profiles.ToString(Newtonsoft.Json.Formatting.None)))
+        End SyncLock
+    End Function
+
+    Private Function PruneHostProfilesLocked() As Boolean
+        If CurrentState.HostProfiles Is Nothing Then Return False
+
+        Dim Changed = False
+        Dim Now = Date.UtcNow
+        For i = CurrentState.HostProfiles.Count - 1 To 1 Step -1
+            If (Now - CurrentState.HostProfiles(i).UpdatedAt).TotalSeconds >= 10 Then
+                CurrentState.HostProfiles.RemoveAt(i)
+                Changed = True
+            End If
+        Next
+        Return Changed
+    End Function
+
+    Private Function ReadRequiredString(Root As JObject, Name As String) As String
+        Dim Token = Root.SelectToken(Name)
+        If Token Is Nothing OrElse Token.Type <> JTokenType.String Then Throw New InvalidDataException("Missing JSON string field: " & Name)
+        Return Token.ToString()
+    End Function
 
 #End Region
 
@@ -426,11 +540,284 @@ Public Class TaowaPacketResponse
         Me.Data = If(Data, New Byte() {})
     End Sub
 
+    Public Shared Function Ok(Optional Data As Byte() = Nothing) As TaowaPacketResponse
+        Return New TaowaPacketResponse(0, If(Data, New Byte() {}))
+    End Function
+
+    Public Shared Function Fail(Status As Byte, Optional Data As Byte() = Nothing) As TaowaPacketResponse
+        Return New TaowaPacketResponse(Status, If(Data, New Byte() {}))
+    End Function
+
     Public ReadOnly Property IsOk As Boolean
         Get
             Return Status = 0
         End Get
     End Property
+End Class
+
+Public Delegate Function TaowaScaffoldingHandler(Request As Byte()) As TaowaPacketResponse
+
+Public Class TaowaScaffoldingHandlerEntry
+    Public ReadOnly Property NamespaceName As String
+    Public ReadOnly Property PathName As String
+    Public ReadOnly Property Handler As TaowaScaffoldingHandler
+
+    Public Sub New(NamespaceName As String, PathName As String, Handler As TaowaScaffoldingHandler)
+        If String.IsNullOrEmpty(NamespaceName) Then Throw New ArgumentException("Namespace is empty")
+        If String.IsNullOrEmpty(PathName) Then Throw New ArgumentException("Path is empty")
+        If Handler Is Nothing Then Throw New ArgumentNullException(NameOf(Handler))
+        Me.NamespaceName = NamespaceName
+        Me.PathName = PathName
+        Me.Handler = Handler
+    End Sub
+
+    Public ReadOnly Property Key As String
+        Get
+            Return NamespaceName & ":" & PathName
+        End Get
+    End Property
+End Class
+
+Public Class TaowaScaffoldingRequest
+    Public ReadOnly Property NamespaceName As String
+    Public ReadOnly Property PathName As String
+    Public ReadOnly Property Body As Byte()
+
+    Public Sub New(NamespaceName As String, PathName As String, Body As Byte())
+        Me.NamespaceName = NamespaceName
+        Me.PathName = PathName
+        Me.Body = If(Body, New Byte() {})
+    End Sub
+End Class
+
+Public Class TaowaScaffoldingClientSession
+    Implements IDisposable
+
+    Private Const TimeoutMilliseconds As Integer = 64000
+    Private ReadOnly Client As TcpClient
+    Private ReadOnly StreamGate As New Object
+    Private Alive As Boolean = True
+
+    Private Sub New(Client As TcpClient)
+        Me.Client = Client
+        Me.Client.ReceiveTimeout = TimeoutMilliseconds
+        Me.Client.SendTimeout = TimeoutMilliseconds
+    End Sub
+
+    Public Shared Function Open(Address As IPAddress, Port As Integer) As TaowaScaffoldingClientSession
+        If Address Is Nothing Then Throw New ArgumentNullException(NameOf(Address))
+        Dim Client As New TcpClient(Address.AddressFamily)
+        Dim Result As IAsyncResult = Nothing
+        Try
+            Result = Client.BeginConnect(Address, Port, Nothing, Nothing)
+            If Not Result.AsyncWaitHandle.WaitOne(TimeoutMilliseconds) Then
+                Throw New TimeoutException("Scaffolding connect timeout")
+            End If
+            Client.EndConnect(Result)
+            Return New TaowaScaffoldingClientSession(Client)
+        Catch
+            Try
+                Client.Close()
+            Catch
+            End Try
+            Throw
+        Finally
+            If Result IsNot Nothing Then
+                Try
+                    Result.AsyncWaitHandle.Close()
+                Catch
+                End Try
+            End If
+        End Try
+    End Function
+
+    Public Shared Function Open(Address As String, Port As Integer) As TaowaScaffoldingClientSession
+        Return Open(IPAddress.Parse(Address), Port)
+    End Function
+
+    Public ReadOnly Property IsAlive As Boolean
+        Get
+            Return Alive AndAlso Client IsNot Nothing AndAlso Client.Connected
+        End Get
+    End Property
+
+    Public Function SendSync(NamespaceName As String, PathName As String, Optional Body As Byte() = Nothing) As TaowaPacketResponse
+        Dim Response = SendRawSync(NamespaceName, PathName, Body)
+        If Response Is Nothing OrElse Not Response.IsOk Then Return Nothing
+        Return Response
+    End Function
+
+    Public Function SendRawSync(NamespaceName As String, PathName As String, Optional Body As Byte() = Nothing) As TaowaPacketResponse
+        If Not IsAlive Then Return Nothing
+
+        Try
+            SyncLock StreamGate
+                Dim Request = Pcl2TaowaCore.CreateScaffoldingRequest(NamespaceName, PathName, Body)
+                Dim Stream = Client.GetStream()
+                Stream.Write(Request, 0, Request.Length)
+                Stream.Flush()
+
+                Dim Header = ReadExact(Stream, 5)
+                Dim BodyLength = ReadUInt32BigEndian(Header, 1)
+                Dim ResponseBody = ReadExact(Stream, BodyLength)
+                Return New TaowaPacketResponse(Header(0), ResponseBody)
+            End SyncLock
+        Catch
+            Alive = False
+            Return Nothing
+        End Try
+    End Function
+
+    Private Shared Function ReadExact(Stream As NetworkStream, Length As Integer) As Byte()
+        If Length <= 0 Then Return New Byte() {}
+        Dim Buffer(Length - 1) As Byte
+        Dim Offset = 0
+        Do While Offset < Length
+            Dim Read = Stream.Read(Buffer, Offset, Length - Offset)
+            If Read <= 0 Then Throw New EndOfStreamException()
+            Offset += Read
+        Loop
+        Return Buffer
+    End Function
+
+    Private Shared Function ReadUInt32BigEndian(Buffer As Byte(), Offset As Integer) As Integer
+        Dim Value = (CLng(Buffer(Offset)) << 24) Or (CLng(Buffer(Offset + 1)) << 16) Or (CLng(Buffer(Offset + 2)) << 8) Or CLng(Buffer(Offset + 3))
+        If Value > Integer.MaxValue Then Throw New InvalidDataException("Scaffolding body is too large")
+        Return CInt(Value)
+    End Function
+
+    Public Sub Dispose() Implements IDisposable.Dispose
+        Alive = False
+        Try
+            Client.Close()
+        Catch
+        End Try
+    End Sub
+End Class
+
+Public Class TaowaScaffoldingServer
+    Implements IDisposable
+
+    Private Const TimeoutMilliseconds As Integer = 64000
+    Private ReadOnly Handlers As New Dictionary(Of String, TaowaScaffoldingHandler)(StringComparer.Ordinal)
+    Private Listener As TcpListener = Nothing
+    Private Cancelled As Boolean = False
+
+    Private Sub New(Handlers As IEnumerable(Of TaowaScaffoldingHandlerEntry))
+        If Handlers IsNot Nothing Then
+            For Each Entry In Handlers
+                Me.Handlers(Entry.Key) = Entry.Handler
+            Next
+        End If
+    End Sub
+
+    Public ReadOnly Property Port As Integer
+        Get
+            If Listener Is Nothing Then Return 0
+            Return DirectCast(Listener.LocalEndpoint, IPEndPoint).Port
+        End Get
+    End Property
+
+    Public Shared Function StartDefault(Handlers As IEnumerable(Of TaowaScaffoldingHandlerEntry)) As TaowaScaffoldingServer
+        Try
+            Return Start(Handlers, Pcl2TaowaCore.ScaffoldingDefaultPort)
+        Catch
+            Return Start(Handlers, 0)
+        End Try
+    End Function
+
+    Public Shared Function Start(Handlers As IEnumerable(Of TaowaScaffoldingHandlerEntry), Port As Integer) As TaowaScaffoldingServer
+        Dim Server As New TaowaScaffoldingServer(Handlers)
+        Server.Listener = New TcpListener(IPAddress.Any, Port)
+        Server.Listener.Start(128)
+        ThreadPool.QueueUserWorkItem(Sub(__) Server.AcceptLoop())
+        Return Server
+    End Function
+
+    Private Sub AcceptLoop()
+        Do While Not Cancelled
+            Try
+                Dim Client = Listener.AcceptTcpClient()
+                Client.ReceiveTimeout = TimeoutMilliseconds
+                Client.SendTimeout = TimeoutMilliseconds
+                ThreadPool.QueueUserWorkItem(Sub(__) HandleClient(Client))
+            Catch ex As SocketException
+                If Not Cancelled Then Thread.Sleep(200)
+            Catch ex As ObjectDisposedException
+                Return
+            Catch ex As Exception
+                If Not Cancelled Then Thread.Sleep(200)
+            End Try
+        Loop
+    End Sub
+
+    Private Sub HandleClient(Client As TcpClient)
+        Using OwnedClient = Client
+            Dim Stream = OwnedClient.GetStream()
+            Do While Not Cancelled AndAlso OwnedClient.Connected
+                Try
+                    Dim Request = ReadRequest(Stream)
+                    Dim Response = Dispatch(Request)
+                    Dim Data = Pcl2TaowaCore.CreateScaffoldingResponse(Response.Status, Response.Data)
+                    Stream.Write(Data, 0, Data.Length)
+                    Stream.Flush()
+                Catch
+                    Return
+                End Try
+            Loop
+        End Using
+    End Sub
+
+    Private Function Dispatch(Request As TaowaScaffoldingRequest) As TaowaPacketResponse
+        Dim Handler As TaowaScaffoldingHandler = Nothing
+        If Not Handlers.TryGetValue(Request.NamespaceName & ":" & Request.PathName, Handler) Then
+            Return TaowaPacketResponse.Fail(255, Encoding.UTF8.GetBytes("Requested protocol hasn't been implemented."))
+        End If
+
+        Try
+            Dim Response = Handler(Request.Body)
+            Return If(Response, TaowaPacketResponse.Ok())
+        Catch ex As Exception
+            Return TaowaPacketResponse.Fail(255, Encoding.UTF8.GetBytes(ex.ToString()))
+        End Try
+    End Function
+
+    Private Shared Function ReadRequest(Stream As NetworkStream) As TaowaScaffoldingRequest
+        Dim KindSize = ReadExact(Stream, 1)(0)
+        Dim Kind = Encoding.UTF8.GetString(ReadExact(Stream, KindSize))
+        Dim Kinds = Kind.Split(":"c)
+        If Kinds.Length <> 2 Then Throw New InvalidDataException("Invalid request kind.")
+
+        Dim Size = ReadExact(Stream, 4)
+        Dim BodyLength = ReadUInt32BigEndian(Size, 0)
+        Return New TaowaScaffoldingRequest(Kinds(0), Kinds(1), ReadExact(Stream, BodyLength))
+    End Function
+
+    Private Shared Function ReadExact(Stream As NetworkStream, Length As Integer) As Byte()
+        If Length <= 0 Then Return New Byte() {}
+        Dim Buffer(Length - 1) As Byte
+        Dim Offset = 0
+        Do While Offset < Length
+            Dim Read = Stream.Read(Buffer, Offset, Length - Offset)
+            If Read <= 0 Then Throw New EndOfStreamException()
+            Offset += Read
+        Loop
+        Return Buffer
+    End Function
+
+    Private Shared Function ReadUInt32BigEndian(Buffer As Byte(), Offset As Integer) As Integer
+        Dim Value = (CLng(Buffer(Offset)) << 24) Or (CLng(Buffer(Offset + 1)) << 16) Or (CLng(Buffer(Offset + 2)) << 8) Or CLng(Buffer(Offset + 3))
+        If Value > Integer.MaxValue Then Throw New InvalidDataException("Scaffolding body is too large")
+        Return CInt(Value)
+    End Function
+
+    Public Sub Dispose() Implements IDisposable.Dispose
+        Cancelled = True
+        Try
+            If Listener IsNot Nothing Then Listener.Stop()
+        Catch
+        End Try
+    End Sub
 End Class
 
 Public Class TaowaAppState
