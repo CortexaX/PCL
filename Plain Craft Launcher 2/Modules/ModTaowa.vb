@@ -17,6 +17,7 @@ Public Module Pcl2Taowa
     Private NodesCachedAt As Date = Date.MinValue
     Private LastError As String = Nothing
     Private LastHostRoom As String = Nothing
+    Private InternalStarted As Boolean = False
 
     Public ReadOnly Property ApiPort As Integer
         Get
@@ -24,8 +25,15 @@ Public Module Pcl2Taowa
         End Get
     End Property
 
+    Private ReadOnly Property UseInternalBackend As Boolean
+        Get
+            Return String.Equals(Environment.GetEnvironmentVariable("PCL_TAOWA_INTERNAL"), "1", StringComparison.OrdinalIgnoreCase)
+        End Get
+    End Property
+
     Public ReadOnly Property IsRunning As Boolean
         Get
+            If UseInternalBackend Then Return InternalStarted
             If CurrentApiPort > 0 AndAlso HttpAlive(CurrentApiPort) Then Return True
             If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited Then Return CurrentApiPort > 0
             Return False
@@ -187,6 +195,13 @@ Public Module Pcl2Taowa
     Public Sub EnsureStarted()
         Try
             Log("EnsureStarted()")
+            If UseInternalBackend Then
+                Pcl2TaowaInternal.EnsureInitialized()
+                InternalStarted = True
+                LastError = Nothing
+                Return
+            End If
+
             SyncLock Gate
                 If CurrentApiPort > 0 AndAlso HttpAlive(CurrentApiPort) Then
                     Log("reuse existing API port=" & CurrentApiPort)
@@ -201,6 +216,7 @@ Public Module Pcl2Taowa
             LastError = Nothing
         Catch ex As Exception
             LastError = ex.Message
+            InternalStarted = False
             Log("EnsureStarted FAIL: " & ex.ToString())
         End Try
     End Sub
@@ -260,6 +276,13 @@ Public Module Pcl2Taowa
 
     Public Sub [Stop]()
         SyncLock Gate
+            If UseInternalBackend Then
+                Pcl2TaowaInternal.Reset()
+                InternalStarted = False
+                CurrentApiPort = 0
+                Return
+            End If
+
             Try
                 If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited Then
                     CoreProcess.Kill()
@@ -273,6 +296,7 @@ Public Module Pcl2Taowa
     End Sub
 
     Public Function GetStateRaw() As String
+        If UseInternalBackend Then Return Pcl2TaowaCore.GetStateRaw()
         EnsureStarted()
         Return Http.GetStringAsync($"http://127.0.0.1:{CurrentApiPort}/state").GetAwaiter().GetResult()
     End Function
@@ -315,15 +339,20 @@ Public Module Pcl2Taowa
             Reset()
             Thread.Sleep(300)
 
-            Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/scanning?player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
-            Log("HOST " & Address)
-            Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
-            Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            Log($"HOST resp {CInt(Response.StatusCode)} {Body}")
-            If Not Response.IsSuccessStatusCode Then
-                Hint("创建房间失败：HTTP " & CInt(Response.StatusCode), HintType.Red)
-                ShowInfoDialog("创建房间请求失败。" & vbCrLf & "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf & Body, "陶瓦联机 · 错误", True)
-                Return
+            If UseInternalBackend Then
+                Log("HOST internal")
+                Pcl2TaowaInternal.StartHost(PlayerName.Trim(), PublicNodes:=ResolvePublicNodes())
+            Else
+                Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/scanning?player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
+                Log("HOST " & Address)
+                Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
+                Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                Log($"HOST resp {CInt(Response.StatusCode)} {Body}")
+                If Not Response.IsSuccessStatusCode Then
+                    Hint("创建房间失败：HTTP " & CInt(Response.StatusCode), HintType.Red)
+                    ShowInfoDialog("创建房间请求失败。" & vbCrLf & "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf & Body, "陶瓦联机 · 错误", True)
+                    Return
+                End If
             End If
 
             Hint("已开始扫描 · 已注入中继节点 · 请在 MC 对局域网开放", HintType.Green)
@@ -422,19 +451,31 @@ Public Module Pcl2Taowa
                 Log("Join pre-check: " & ex.Message)
             End Try
 
-            Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/guesting?room={Uri.EscapeDataString(Room)}&player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
-            Log("JOIN " & Address)
-            Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
-            Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            Log($"JOIN resp {CInt(Response.StatusCode)} {Body}")
-            If Not Response.IsSuccessStatusCode Then
-                RecoverToIdle()
-                Hint("加入失败：HTTP " & CInt(Response.StatusCode) & "（检查房间码）", HintType.Red)
-                ShowInfoDialog("加入房间请求失败。" & vbCrLf &
-                               "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf &
-                               "请检查房间码是否完整、格式是否正确。" & vbCrLf & vbCrLf & Body,
-                               "陶瓦联机 · 错误", True)
-                Return
+            If UseInternalBackend Then
+                Log("JOIN internal")
+                If Not Pcl2TaowaInternal.StartGuest(Room, PlayerName.Trim(), PublicNodes:=ResolvePublicNodes()) Then
+                    RecoverToIdle()
+                    Hint("加入失败：房间码格式无效或当前状态不可加入", HintType.Red)
+                    ShowInfoDialog("加入房间请求失败。" & vbCrLf &
+                                   "请检查房间码是否完整、格式是否正确，或先重置当前联机状态。",
+                                   "陶瓦联机 · 错误", True)
+                    Return
+                End If
+            Else
+                Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/guesting?room={Uri.EscapeDataString(Room)}&player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
+                Log("JOIN " & Address)
+                Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
+                Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                Log($"JOIN resp {CInt(Response.StatusCode)} {Body}")
+                If Not Response.IsSuccessStatusCode Then
+                    RecoverToIdle()
+                    Hint("加入失败：HTTP " & CInt(Response.StatusCode) & "（检查房间码）", HintType.Red)
+                    ShowInfoDialog("加入房间请求失败。" & vbCrLf &
+                                   "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf &
+                                   "请检查房间码是否完整、格式是否正确。" & vbCrLf & vbCrLf & Body,
+                                   "陶瓦联机 · 错误", True)
+                    Return
+                End If
             End If
 
             Hint("加入请求成功 · 等待地址…", HintType.Green)
@@ -489,6 +530,12 @@ Public Module Pcl2Taowa
 
     Public Sub Reset()
         Try
+            If UseInternalBackend Then
+                Pcl2TaowaInternal.Reset()
+                Log("reset internal idle")
+                Return
+            End If
+
             EnsureStarted()
             Http.GetAsync($"http://127.0.0.1:{CurrentApiPort}/state/ide").GetAwaiter().GetResult()
             Log("reset idle")

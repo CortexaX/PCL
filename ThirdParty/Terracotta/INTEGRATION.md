@@ -64,5 +64,6 @@ directly instead of starting `terracotta.exe --hmcl`.
   EasyTier, scaffolding session, Minecraft port forwarding, and player profile
   synchronization.
 - `Plain Craft Launcher 2/Modules/ModTaowa.vb` still uses the transitional
-  `terracotta.exe --hmcl` backend until the internal path is runtime-tested and
-  deliberately selected as the active implementation.
+  `terracotta.exe --hmcl` backend by default. Set `PCL_TAOWA_INTERNAL=1` before
+  launching PCL2 to exercise the internal .NET backend until it is runtime-tested
+  and deliberately selected as the active implementation.
