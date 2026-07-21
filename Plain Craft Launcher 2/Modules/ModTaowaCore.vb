@@ -6,6 +6,7 @@ Public Module Pcl2TaowaCore
 
     Private Const TerracottaVersion As String = "0.4.2"
     Private Const EasyTierVersion As String = "v2.5.0-terracotta.2"
+    Public Const TaowaMotd As String = "§6§l双击进入陶瓦联机大厅（请保持陶瓦运行）"
     Public Const ScaffoldingDefaultPort As Integer = 13448
     Private Const RoomCodeLength As Integer = 21
     Private ReadOnly RoomChars As Char() = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ".ToCharArray()
@@ -166,10 +167,11 @@ Public Module Pcl2TaowaCore
         End SyncLock
     End Function
 
-    Public Function SetGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture) As TaowaStateCapture
+    Public Function SetGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture,
+                               Optional FakeServer As TaowaMinecraftFakeServer = Nothing) As TaowaStateCapture
         SyncLock StateLock
             If Not CanCaptureLocked(Capture) Then Return Nothing
-            Return SetStateLocked(TaowaAppState.CreateGuestOk(Room, ServerPort, Profiles))
+            Return SetStateLocked(TaowaAppState.CreateGuestOk(Room, ServerPort, Profiles, FakeServer))
         End SyncLock
     End Function
 
@@ -193,6 +195,7 @@ Public Module Pcl2TaowaCore
     End Function
 
     Private Function SetStateLocked(State As TaowaAppState) As TaowaStateCapture
+        DisposeStateResourcesLocked(CurrentState, State)
         CurrentState = State
         CurrentStateIndex += 1
         CurrentSharingIndex = 0
@@ -209,6 +212,24 @@ Public Module Pcl2TaowaCore
         CurrentStateIndex += 1
         CurrentSharingIndex += 1
         Log("TaowaCore shared -> " & CurrentState.Kind.ToString())
+    End Sub
+
+    Private Sub DisposeStateResourcesLocked(OldState As TaowaAppState, NewState As TaowaAppState)
+        If OldState Is Nothing Then Return
+
+        If OldState.Scanner IsNot Nothing AndAlso (NewState Is Nothing OrElse Not Object.ReferenceEquals(OldState.Scanner, NewState.Scanner)) Then
+            Try
+                OldState.Scanner.Dispose()
+            Catch
+            End Try
+        End If
+
+        If OldState.FakeServer IsNot Nothing AndAlso (NewState Is Nothing OrElse Not Object.ReferenceEquals(OldState.FakeServer, NewState.FakeServer)) Then
+            Try
+                OldState.FakeServer.Dispose()
+            Catch
+            End Try
+        End If
     End Sub
 
 #End Region
@@ -410,6 +431,44 @@ Public Module Pcl2TaowaCore
         Dim Token = Root.SelectToken(Name)
         If Token Is Nothing OrElse Token.Type <> JTokenType.String Then Throw New InvalidDataException("Missing JSON string field: " & Name)
         Return Token.ToString()
+    End Function
+
+#End Region
+
+#Region "Minecraft"
+
+    Public Function CheckMinecraftConnection(Port As Integer) As Boolean
+        Dim Started = Date.UtcNow
+        Try
+            Using Client As New TcpClient(AddressFamily.InterNetwork)
+                Client.ReceiveTimeout = 64000
+                Client.SendTimeout = 64000
+
+                Dim Result As IAsyncResult = Nothing
+                Try
+                    Result = Client.BeginConnect(IPAddress.Loopback, Port, Nothing, Nothing)
+                    If Not Result.AsyncWaitHandle.WaitOne(64000) Then Throw New TimeoutException("Minecraft connect timeout")
+                    Client.EndConnect(Result)
+                Finally
+                    If Result IsNot Nothing Then
+                        Try
+                            Result.AsyncWaitHandle.Close()
+                        Catch
+                        End Try
+                    End If
+                End Try
+
+                Dim Stream = Client.GetStream()
+                Stream.WriteByte(&HFE)
+                Stream.Flush()
+                Return Stream.ReadByte() = &HFF
+            End Using
+        Catch
+        End Try
+
+        Dim Remaining = 5000 - CInt((Date.UtcNow - Started).TotalMilliseconds)
+        If Remaining > 0 Then Thread.Sleep(Remaining)
+        Return False
     End Function
 
 #End Region
@@ -828,6 +887,7 @@ Public Class TaowaAppState
     Public Property Difficulty As TaowaConnectionDifficulty = TaowaConnectionDifficulty.Unknown
     Public Property ExceptionKind As TaowaExceptionType
     Public Property Scanner As TaowaMinecraftScanner
+    Public Property FakeServer As TaowaMinecraftFakeServer
     Public Property HostProfiles As List(Of TaowaTimedProfile)
     Public Property Profiles As List(Of TaowaProfile)
 
@@ -863,10 +923,12 @@ Public Class TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.GuestStarting) With {.Room = Room, .Difficulty = Difficulty}
     End Function
 
-    Public Shared Function CreateGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile)) As TaowaAppState
+    Public Shared Function CreateGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile),
+                                         Optional FakeServer As TaowaMinecraftFakeServer = Nothing) As TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.GuestOk) With {
             .Room = Room,
             .ServerPort = ServerPort,
+            .FakeServer = FakeServer,
             .Profiles = If(Profiles, New List(Of TaowaProfile)).Select(Function(p) p.Clone()).ToList()
         }
     End Function
@@ -882,7 +944,8 @@ Public Class TaowaAppState
             .ServerPort = ServerPort,
             .Difficulty = Difficulty,
             .ExceptionKind = ExceptionKind,
-            .Scanner = Scanner
+            .Scanner = Scanner,
+            .FakeServer = FakeServer
         }
         If HostProfiles IsNot Nothing Then Result.HostProfiles = HostProfiles.Select(Function(p) p.Clone()).ToList()
         If Profiles IsNot Nothing Then Result.Profiles = Profiles.Select(Function(p) p.Clone()).ToList()
@@ -929,6 +992,79 @@ Public Class TaowaAppState
                 Return New JObject(New JProperty("state", "waiting"), New JProperty("index", Index))
         End Select
     End Function
+End Class
+
+Public Class TaowaMinecraftFakeServer
+    Implements IDisposable
+
+    Private Const LanPort As Integer = 4445
+    Private ReadOnly Cancellation As New Threading.CancellationTokenSource
+    Private ReadOnly Motd As String
+    Public ReadOnly Property Port As Integer
+
+    Private Sub New(Port As Integer, Motd As String)
+        Me.Port = Port
+        Me.Motd = If(Motd, Pcl2TaowaCore.TaowaMotd)
+        ThreadPool.QueueUserWorkItem(Sub(__) BroadcastLoop())
+    End Sub
+
+    Public Shared Function Create(Port As Integer, Optional Motd As String = Nothing) As TaowaMinecraftFakeServer
+        Return New TaowaMinecraftFakeServer(Port, Motd)
+    End Function
+
+    Private Sub BroadcastLoop()
+        Dim Targets As New List(Of Tuple(Of UdpClient, IPEndPoint))
+        Try
+            AddIpv4Target(Targets)
+            AddIpv6Target(Targets)
+
+            Dim Data = Encoding.UTF8.GetBytes("[MOTD]" & Motd & "[/MOTD][AD]" & Port & "[/AD]")
+            Do While Not Cancellation.IsCancellationRequested
+                For Each Target In Targets
+                    Try
+                        Target.Item1.Send(Data, Data.Length, Target.Item2)
+                    Catch
+                    End Try
+                Next
+
+                If Cancellation.Token.WaitHandle.WaitOne(1500) Then Return
+            Loop
+        Finally
+            For Each Target In Targets
+                Try
+                    Target.Item1.Close()
+                Catch
+                End Try
+            Next
+        End Try
+    End Sub
+
+    Private Sub AddIpv4Target(Targets As List(Of Tuple(Of UdpClient, IPEndPoint)))
+        Try
+            Dim Client As New UdpClient(AddressFamily.InterNetwork)
+            Client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, True)
+            Client.Client.Bind(New IPEndPoint(IPAddress.Any, 0))
+            Client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 4)
+            Client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, True)
+            Targets.Add(Tuple.Create(Client, New IPEndPoint(IPAddress.Parse("224.0.2.60"), LanPort)))
+        Catch
+        End Try
+    End Sub
+
+    Private Sub AddIpv6Target(Targets As List(Of Tuple(Of UdpClient, IPEndPoint)))
+        Try
+            Dim Client As New UdpClient(AddressFamily.InterNetworkV6)
+            Client.Client.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.MulticastLoopback, True)
+            Client.Client.Bind(New IPEndPoint(IPAddress.IPv6Any, 0))
+            Targets.Add(Tuple.Create(Client, New IPEndPoint(IPAddress.Parse("FF75:230::60"), LanPort)))
+        Catch
+        End Try
+    End Sub
+
+    Public Sub Dispose() Implements IDisposable.Dispose
+        Cancellation.Cancel()
+        Cancellation.Dispose()
+    End Sub
 End Class
 
 Public Class TaowaMinecraftScanner

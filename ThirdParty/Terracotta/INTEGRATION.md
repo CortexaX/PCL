@@ -45,7 +45,8 @@ directly instead of starting `terracotta.exe --hmcl`.
 - `Plain Craft Launcher 2/Modules/ModTaowaCore.vb` ports the room code
   generation/parsing, profile model, app-state JSON shape, scaffolding packet
   framing, TCP client/server session layer, default `c:*` protocol handlers,
-  and Minecraft LAN scanner from the Rust source.
+  Minecraft LAN scanner, fake LAN server broadcaster, and Minecraft connection
+  probing from the Rust source.
 - `Plain Craft Launcher 2/Modules/ModTaowaEasyTier.vb` ports EasyTier argument
   construction, NAT/difficulty mapping, local port allocation, process startup,
   CLI peer parsing, and port-forward control scaffolding from the Rust source.
