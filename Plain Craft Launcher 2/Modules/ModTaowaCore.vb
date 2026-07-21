@@ -146,10 +146,11 @@ Public Module Pcl2TaowaCore
         End SyncLock
     End Function
 
-    Public Function SetHostOk(Room As TaowaRoom, Port As Integer, Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture) As TaowaStateCapture
+    Public Function SetHostOk(Room As TaowaRoom, Port As Integer, Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture,
+                              Optional EasyTier As TaowaEasyTierProcess = Nothing) As TaowaStateCapture
         SyncLock StateLock
             If Not CanCaptureLocked(Capture) Then Return Nothing
-            Return SetStateLocked(TaowaAppState.CreateHostOk(Room, Port, Profiles))
+            Return SetStateLocked(TaowaAppState.CreateHostOk(Room, Port, Profiles, EasyTier))
         End SyncLock
     End Function
 
@@ -160,18 +161,48 @@ Public Module Pcl2TaowaCore
         End SyncLock
     End Function
 
-    Public Function SetGuestStarting(Room As TaowaRoom, Difficulty As TaowaConnectionDifficulty, Capture As TaowaStateCapture) As TaowaStateCapture
+    Public Function SetGuestStarting(Room As TaowaRoom, Difficulty As TaowaConnectionDifficulty, Capture As TaowaStateCapture,
+                                     Optional EasyTier As TaowaEasyTierProcess = Nothing) As TaowaStateCapture
         SyncLock StateLock
             If Not CanCaptureLocked(Capture) Then Return Nothing
-            Return SetStateLocked(TaowaAppState.CreateGuestStarting(Room, Difficulty))
+            Return SetStateLocked(TaowaAppState.CreateGuestStarting(Room, Difficulty, EasyTier))
         End SyncLock
     End Function
 
     Public Function SetGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture,
+                               Optional EasyTier As TaowaEasyTierProcess = Nothing,
                                Optional FakeServer As TaowaMinecraftFakeServer = Nothing) As TaowaStateCapture
         SyncLock StateLock
             If Not CanCaptureLocked(Capture) Then Return Nothing
-            Return SetStateLocked(TaowaAppState.CreateGuestOk(Room, ServerPort, Profiles, FakeServer))
+            Return SetStateLocked(TaowaAppState.CreateGuestOk(Room, ServerPort, Profiles, EasyTier, FakeServer))
+        End SyncLock
+    End Function
+
+    Public Function SetGuestDifficulty(Difficulty As TaowaConnectionDifficulty, Capture As TaowaStateCapture) As Boolean
+        SyncLock StateLock
+            If Not CanCaptureLocked(Capture) OrElse CurrentState.Kind <> TaowaAppStateKind.GuestStarting Then Return False
+            CurrentState.Difficulty = Difficulty
+            IncreaseSharedLocked()
+            Return True
+        End SyncLock
+    End Function
+
+    Public Function SetGuestProfiles(Profiles As IEnumerable(Of TaowaProfile), Capture As TaowaStateCapture) As Boolean
+        SyncLock StateLock
+            If Not CanCaptureLocked(Capture) OrElse CurrentState.Kind <> TaowaAppStateKind.GuestOk Then Return False
+            Dim NextProfiles = If(Profiles, New List(Of TaowaProfile)).Select(Function(p) p.Clone()).ToList()
+            If ProfilesEqual(CurrentState.Profiles, NextProfiles) Then Return True
+            CurrentState.Profiles = NextProfiles
+            IncreaseSharedLocked()
+            Return True
+        End SyncLock
+    End Function
+
+    Public Function PruneHostProfiles(Capture As TaowaStateCapture) As Boolean
+        SyncLock StateLock
+            If Not CanCaptureLocked(Capture) OrElse CurrentState.Kind <> TaowaAppStateKind.HostOk Then Return False
+            If PruneHostProfilesLocked() Then IncreaseSharedLocked()
+            Return True
         End SyncLock
     End Function
 
@@ -230,7 +261,26 @@ Public Module Pcl2TaowaCore
             Catch
             End Try
         End If
+
+        If OldState.EasyTier IsNot Nothing AndAlso (NewState Is Nothing OrElse Not Object.ReferenceEquals(OldState.EasyTier, NewState.EasyTier)) Then
+            Try
+                OldState.EasyTier.Dispose()
+            Catch
+            End Try
+        End If
     End Sub
+
+    Private Function ProfilesEqual(Left As List(Of TaowaProfile), Right As List(Of TaowaProfile)) As Boolean
+        If Left Is Nothing OrElse Right Is Nothing Then Return Left Is Right
+        If Left.Count <> Right.Count Then Return False
+        For i = 0 To Left.Count - 1
+            If Not String.Equals(Left(i).MachineId, Right(i).MachineId, StringComparison.Ordinal) Then Return False
+            If Not String.Equals(Left(i).Name, Right(i).Name, StringComparison.Ordinal) Then Return False
+            If Not String.Equals(Left(i).Vendor, Right(i).Vendor, StringComparison.Ordinal) Then Return False
+            If Left(i).Kind <> Right(i).Kind Then Return False
+        Next
+        Return True
+    End Function
 
 #End Region
 
@@ -888,6 +938,7 @@ Public Class TaowaAppState
     Public Property ExceptionKind As TaowaExceptionType
     Public Property Scanner As TaowaMinecraftScanner
     Public Property FakeServer As TaowaMinecraftFakeServer
+    Public Property EasyTier As TaowaEasyTierProcess
     Public Property HostProfiles As List(Of TaowaTimedProfile)
     Public Property Profiles As List(Of TaowaProfile)
 
@@ -907,10 +958,12 @@ Public Class TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.HostStarting) With {.Room = Room, .Port = Port}
     End Function
 
-    Public Shared Function CreateHostOk(Room As TaowaRoom, Port As Integer, Profiles As IEnumerable(Of TaowaProfile)) As TaowaAppState
+    Public Shared Function CreateHostOk(Room As TaowaRoom, Port As Integer, Profiles As IEnumerable(Of TaowaProfile),
+                                        Optional EasyTier As TaowaEasyTierProcess = Nothing) As TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.HostOk) With {
             .Room = Room,
             .Port = Port,
+            .EasyTier = EasyTier,
             .HostProfiles = If(Profiles, New List(Of TaowaProfile)).Select(Function(p) New TaowaTimedProfile(p.Clone())).ToList()
         }
     End Function
@@ -919,15 +972,18 @@ Public Class TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.GuestConnecting) With {.Room = Room}
     End Function
 
-    Public Shared Function CreateGuestStarting(Room As TaowaRoom, Difficulty As TaowaConnectionDifficulty) As TaowaAppState
-        Return New TaowaAppState(TaowaAppStateKind.GuestStarting) With {.Room = Room, .Difficulty = Difficulty}
+    Public Shared Function CreateGuestStarting(Room As TaowaRoom, Difficulty As TaowaConnectionDifficulty,
+                                               Optional EasyTier As TaowaEasyTierProcess = Nothing) As TaowaAppState
+        Return New TaowaAppState(TaowaAppStateKind.GuestStarting) With {.Room = Room, .Difficulty = Difficulty, .EasyTier = EasyTier}
     End Function
 
     Public Shared Function CreateGuestOk(Room As TaowaRoom, ServerPort As Integer, Profiles As IEnumerable(Of TaowaProfile),
+                                         Optional EasyTier As TaowaEasyTierProcess = Nothing,
                                          Optional FakeServer As TaowaMinecraftFakeServer = Nothing) As TaowaAppState
         Return New TaowaAppState(TaowaAppStateKind.GuestOk) With {
             .Room = Room,
             .ServerPort = ServerPort,
+            .EasyTier = EasyTier,
             .FakeServer = FakeServer,
             .Profiles = If(Profiles, New List(Of TaowaProfile)).Select(Function(p) p.Clone()).ToList()
         }
@@ -945,7 +1001,8 @@ Public Class TaowaAppState
             .Difficulty = Difficulty,
             .ExceptionKind = ExceptionKind,
             .Scanner = Scanner,
-            .FakeServer = FakeServer
+            .FakeServer = FakeServer,
+            .EasyTier = EasyTier
         }
         If HostProfiles IsNot Nothing Then Result.HostProfiles = HostProfiles.Select(Function(p) p.Clone()).ToList()
         If Profiles IsNot Nothing Then Result.Profiles = Profiles.Select(Function(p) p.Clone()).ToList()
