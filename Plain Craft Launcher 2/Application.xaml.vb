@@ -290,11 +290,11 @@ RetryCacheCheck:
         End Select
     End Sub
 
-    Public Shared ShowingTooltips As New List(Of ToolTip)
-    Private Sub OnTooltipOpened(sender As ToolTip, e As RoutedEventArgs)
+    Public Shared ShowingTooltips As New List(Of Border)
+    Private Sub TooltipLoaded(sender As Border, e As EventArgs)
         ShowingTooltips.Add(sender)
     End Sub
-    Private Sub OnTooltipClosed(sender As ToolTip, e As RoutedEventArgs)
+    Private Sub TooltipUnloaded(sender As Border, e As RoutedEventArgs)
         ShowingTooltips.Remove(sender)
     End Sub
 
