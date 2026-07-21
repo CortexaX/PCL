@@ -18,9 +18,7 @@ Public Class MyScrollViewer
         End If
         e.Handled = True
         PerformVerticalOffsetDelta(-e.Delta)
-        '关闭 Tooltip (#2552)
-        '通过 IsOpen 关闭 Tooltip 而不是降低 Border 不透明度 (#5744)
-        Application.ShowingTooltips.ForEach(Sub(tooltip) tooltip.IsOpen = False)
+        Application.ShowingTooltips.ForEach(Sub(tooltip) AniStart(AaOpacity(tooltip, -1, 100), "Hide Tooltip " & GetUuid()))
     End Sub
     Public Sub PerformVerticalOffsetDelta(Delta As Double)
         AniStart(
