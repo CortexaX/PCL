@@ -394,9 +394,9 @@ Public Module Pcl2Taowa
 
             Try
                 Dim RawState = SafeState()
-                Dim State = If(ExtractJsonString(RawState, "state"), "")
+                Dim CurrentState = If(ExtractJsonString(RawState, "state"), "")
                 Dim CurrentRoom = If(ExtractJsonString(RawState, "room"), "")
-                If State.StartsWithF("host-", True) AndAlso NormalizeRoom(CurrentRoom) = NormalizedRoom AndAlso NormalizedRoom.Length > 0 Then
+                If CurrentState.StartsWithF("host-", True) AndAlso NormalizeRoom(CurrentRoom) = NormalizedRoom AndAlso NormalizedRoom.Length > 0 Then
                     Hint("你已是该房间房主，无需加入")
                     ShowInfoDialog("你已经是这个房间的房主，不能在本机再加入。" & vbCrLf & vbCrLf &
                                    "房间码：" & vbCrLf & Room & vbCrLf & vbCrLf &
@@ -411,7 +411,7 @@ Public Module Pcl2Taowa
                                    "陶瓦联机 · 不能加入自己的房", True)
                     Return
                 End If
-                If Not String.IsNullOrEmpty(State) AndAlso Not State.Equals("waiting", StringComparison.OrdinalIgnoreCase) Then
+                If Not String.IsNullOrEmpty(CurrentState) AndAlso Not CurrentState.Equals("waiting", StringComparison.OrdinalIgnoreCase) Then
                     Reset()
                     Thread.Sleep(400)
                 End If
