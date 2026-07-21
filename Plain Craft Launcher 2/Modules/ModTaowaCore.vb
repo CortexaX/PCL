@@ -1,4 +1,5 @@
 Imports System.Numerics
+Imports System.Net.Sockets
 Imports System.Security.Cryptography
 
 Public Module Pcl2TaowaCore
