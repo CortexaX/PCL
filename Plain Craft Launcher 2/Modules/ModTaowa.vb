@@ -220,6 +220,9 @@ Public Module Pcl2Taowa
         CoreProcess = Nothing
         CurrentApiPort = 0
 
+        ' Transitional backend: this launches the upstream Terracotta v0.4.2
+        ' binary whose source is vendored under ThirdParty\Terracotta.
+        ' The target is to replace this path with an in-process .NET port.
         Dim ExePath = FindExe()
         Dim PortFile = Path.Combine(Path.GetTempPath(), "pcl2-taowa-" & Guid.NewGuid().ToString("N"), "http")
         DirectoryUtils.Create(Path.GetDirectoryName(PortFile))

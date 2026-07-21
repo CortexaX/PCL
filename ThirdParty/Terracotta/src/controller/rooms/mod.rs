@@ -1,0 +1,31 @@
+pub mod scaffolding;
+
+#[derive(Debug, Clone)]
+pub struct Room {
+    pub code: String,
+
+    pub network_name: String,
+    pub network_secret: String,
+    #[allow(dead_code)]
+    pub kind: RoomKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum RoomKind {
+    Scaffolding { #[allow(dead_code)] seed: u128 }
+}
+
+#[derive(Debug)]
+pub enum ConnectionDifficulty {
+    Unknown, Easiest, Simple, Medium, Tough
+}
+
+impl Room {
+    pub fn create() -> Room {
+        scaffolding::create_room()
+    }
+
+    pub fn from(code: &str) -> Option<Room> {
+        scaffolding::parse(code)
+    }
+}
