@@ -16,6 +16,11 @@
 - 本地恢复：已恢复主题解锁、主题调色逻辑与 Taowa/Terracotta 测试联机逻辑。
 - 联机源码：Terracotta v0.4.2 源码已作为第三方源码包放入 [ThirdParty/Terracotta](ThirdParty/Terracotta)，PCL2 现在默认使用已移植到 VB/.NET 的内部联机实现，不再携带或启动 `terracotta.exe`。
 
+## 版本分支
+
+- `main`：当前继续维护的完全开源正式分支，最新正式发布为 [v2.13.0.1-cortexa.2](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-cortexa.2)。这一版默认使用内部 VB/.NET Taowa 联机实现，构建产物不再包含 `terracotta.exe` 与 `VCRUNTIME140.DLL`。
+- `reference/v2.13.0.1-cortexa.1`：旧正式版参考分支，对应 [v2.13.0.1-cortexa.1](https://github.com/CortexaX/PCL/releases/tag/v2.13.0.1-cortexa.1) 与提交 `d58a27b0e28704b132c3740590a6bad2b78c3eee`。这个分支保留给需要对照旧正式版恢复过程、行为差异或迁移改动的人参考。
+
 ## 构建
 
 推荐使用 Windows 与 Visual Studio Build Tools / MSBuild 构建：
