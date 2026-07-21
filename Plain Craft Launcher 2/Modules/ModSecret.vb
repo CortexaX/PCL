@@ -46,6 +46,8 @@ Friend Module ModSecret
 
 #Region "主题"
 
+    Private ReadOnly LocalUnlockedThemeIds As Integer() = New Integer() {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 42}
+
     Public Color1 As New MyColor(52, 61, 74)
     Public Color2 As New MyColor(11, 91, 203)
     Public Color3 As New MyColor(19, 112, 243)
@@ -167,6 +169,7 @@ Friend Module ModSecret
         RunInUi(
         Sub()
             Try
+                SyncLocalUnlockedThemes()
                 Dim CurrentTheme = Settings.Get(Of Integer)("UiLauncherTheme")
                 If Not ThemeCheckOne(CurrentTheme) Then
                     Logger.Warn($"检测到尚未解锁的主题：{CurrentTheme}，已重置为默认主题", LogBehavior.ToastIfDebug)
@@ -178,6 +181,19 @@ Friend Module ModSecret
                         If ThemeCheckOne(Id) Then AvailableThemes.Add(Id)
                     Next
                     AvailableThemes.Add(42)
+                    For Each Control In FrmSetupUI.PanLauncherTheme.Children
+                        If TypeOf Control Is MyRadioBox AndAlso SettingService.GetKey(Control) = "UiLauncherTheme" Then
+                            Dim ThemeId = CInt(Val(SettingService.GetValue(Control)))
+                            CType(Control, MyRadioBox).IsEnabled = AvailableThemes.Contains(ThemeId)
+                        End If
+                    Next
+                    FrmSetupUI.RadioLauncherTheme5.Opacity = If(AvailableThemes.Contains(5), 1, 0)
+                    FrmSetupUI.RadioLauncherTheme5Gray.Opacity = If(AvailableThemes.Contains(5), 0, 1)
+                    FrmSetupUI.RadioLauncherTheme5Gray.Visibility = If(AvailableThemes.Contains(5), Visibility.Collapsed, Visibility.Visible)
+                    FrmSetupUI.LabLauncherTheme5Unlock.Visibility = If(AvailableThemes.Contains(5), Visibility.Collapsed, Visibility.Visible)
+                    FrmSetupUI.LabLauncherTheme8Copy.Visibility = If(AvailableThemes.Contains(8), Visibility.Collapsed, Visibility.Visible)
+                    FrmSetupUI.LabLauncherTheme9Copy.Visibility = If(AvailableThemes.Contains(9), Visibility.Collapsed, Visibility.Visible)
+                    FrmSetupUI.LabLauncherTheme11Click.Visibility = If(AvailableThemes.Contains(11), Visibility.Collapsed, Visibility.Visible)
                 End If
             Catch ex As Exception
                 If TypeOf If(ex.InnerException, ex) Is FormatException Then
@@ -190,20 +206,36 @@ Friend Module ModSecret
         End Sub)
     End Sub
     Friend Function ThemeCheckOne(Id As Integer) As Boolean
-        If New Integer() {0, 1, 2, 3, 4, 42}.Contains(Id) Then Return True
-        If PotatoFeatures.Contains("Theme" & Id) Then Return True
-        Select Case Id
-            Case 8
-                Return CurrentRank >= DonationRank.Rank23
-            Case 14
-                Return Enumerable.Range(5, 9).Count(AddressOf ThemeCheckOne) >= 5
-            Case Else
-                If Settings.Get(Of String)("UiLauncherThemeHide").Contains("7") Then ThemeUnlock(7, ShowDoubleHint:=False)
-                Return Settings.Get(Of String)("UiLauncherThemeHide2").Split("|"c).Contains(Id.ToString)
-        End Select
+        Return LocalUnlockedThemeIds.Contains(Id)
     End Function
+    Private Sub SyncLocalUnlockedThemes()
+        Dim UnlockedThemes = Settings.Get(Of String)("UiLauncherThemeHide2").Split("|"c, True).ToList()
+        Dim IsChanged = False
+        For Each Id In LocalUnlockedThemeIds
+            Dim IdText = Id.ToString
+            If Not UnlockedThemes.Contains(IdText) Then
+                UnlockedThemes.Add(IdText)
+                IsChanged = True
+            End If
+        Next
+        If IsChanged Then Settings.Set("UiLauncherThemeHide2", UnlockedThemes.Distinct.ToList.Join("|"c))
+    End Sub
     Friend Function ThemeUnlock(Id As Integer, Optional ShowDoubleHint As Boolean = True, Optional UnlockHint As String = Nothing) As Boolean
-        Return False
+        If Not LocalUnlockedThemeIds.Contains(Id) Then Return False
+
+        Dim IdText = Id.ToString
+        Dim UnlockedThemes = Settings.Get(Of String)("UiLauncherThemeHide2").Split("|"c, True).ToList()
+        If UnlockedThemes.Contains(IdText) Then Return False
+
+        UnlockedThemes.Add(IdText)
+        Settings.Set("UiLauncherThemeHide2", UnlockedThemes.Distinct.ToList.Join("|"c))
+        If UnlockHint IsNot Nothing Then
+            Hint(UnlockHint, HintType.Green)
+        ElseIf ShowDoubleHint Then
+            Hint("隐藏主题已解锁！", HintType.Green)
+        End If
+        ThemeCheckAll(True)
+        Return True
     End Function
 
 #End Region
