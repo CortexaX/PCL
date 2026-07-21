@@ -28,8 +28,6 @@ Public Class PageSetupUI
 
         SliderLoad()
 
-        If BuildType = BuildTypes.Release Then PanLauncherHide.Visibility = Visibility.Visible
-
         '设置解锁
         If Not RadioLauncherTheme8.IsEnabled Then
             LabLauncherTheme8Copy.ToolTip = $"累积赞助达到 ¥23.33 后，在爱发电私信发送【土豆 {Identify}】以解锁。" & vbCrLf & "右键打开赞助页面，如果觉得 PCL 做得还不错就支持一下吧 =w=！"
