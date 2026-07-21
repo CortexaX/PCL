@@ -10,20 +10,20 @@ for PCL2's Taowa/Terracotta link mode.
 - Upstream commit: `70d542156377b316659b4ec2ac62341a43ddc4b2`
 - License: GNU Affero General Public License v3.0, see `LICENSE`
 
-The transitional binaries currently stored in
-`Plain Craft Launcher 2/Resources/Taowa/` match the upstream v0.4.2 Windows
-x86_64 release package:
+The previously used standalone process backend was taken from the upstream
+v0.4.2 Windows x86_64 release package:
 
 | File | SHA256 |
 | --- | --- |
 | `terracotta.exe` | `74c10568a7fea9c1d38cf8d2d4ca90baf1517f8e5a26c63d3349db70bc449796` |
 | `VCRUNTIME140.DLL` | `475ab98b7722e965bd38c8fa6ed23502309582ccf294ff1061cb290c7988f0d1` |
 
-The same version also identifies itself in the PE metadata as Terracotta 0.4.2
-and embeds the string `Easytier: v2.5.0-terracotta.2`.
+Those files are no longer stored under `Plain Craft Launcher 2/Resources/Taowa/`
+and are no longer copied to PCL2 build outputs. Their hashes are kept here only
+as provenance for the reverse-engineering and porting reference.
 
-The internal .NET path uses the same EasyTier version as a separately shipped
-transition asset under `Plain Craft Launcher 2/Resources/Taowa/EasyTier/`:
+The internal .NET path uses EasyTier as a separately shipped transition asset
+under `Plain Craft Launcher 2/Resources/Taowa/EasyTier/`:
 
 | File | SHA256 |
 | --- | --- |
@@ -31,11 +31,11 @@ transition asset under `Plain Craft Launcher 2/Resources/Taowa/EasyTier/`:
 | `easytier-cli.exe` | `d7ff40af0e5c62f51ce9ac2b7682502e6cd0f3e7575972b72783325526283b7d` |
 | `Packet.dll` | `c7c03a87eac7243ccbe331554624b18803010b740e311fc8cfddb573096eacac` |
 
-## Migration target
+## Migration status
 
-The current PCL2 implementation uses these binaries as a temporary backend from
-`Modules/ModTaowa.vb`. The long-term target is to port the behavior into PCL2
-itself and remove the standalone Terracotta process.
+PCL2 now calls the VB/.NET Taowa implementation from `Modules/ModTaowa.vb`
+directly. The standalone `terracotta.exe --hmcl` process backend and
+`VCRUNTIME140.DLL` runtime dependency have been removed from the project.
 
 The Terracotta source splits the behavior into these main areas:
 
@@ -63,7 +63,6 @@ directly instead of starting `terracotta.exe --hmcl`.
   host/guest orchestration loops that connect the state machine, LAN scanner,
   EasyTier, scaffolding session, Minecraft port forwarding, and player profile
   synchronization.
-- `Plain Craft Launcher 2/Modules/ModTaowa.vb` still uses the transitional
-  `terracotta.exe --hmcl` backend by default. Set `PCL_TAOWA_INTERNAL=1` before
-  launching PCL2 to exercise the internal .NET backend until it is runtime-tested
-  and deliberately selected as the active implementation.
+- `Plain Craft Launcher 2/Modules/ModTaowa.vb` uses the internal .NET backend
+  by default. There is no `PCL_TAOWA_INTERNAL` opt-in switch and no fallback
+  launch path for `terracotta.exe --hmcl`.

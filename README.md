@@ -14,7 +14,7 @@
 - 构建公开：使用 GitHub Actions 在 Windows 环境中执行 Release 构建，并上传构建产物。
 - 发布公开：发布页提供可直接下载的构建包与校验信息。
 - 本地恢复：已恢复主题解锁、主题调色逻辑与 Taowa/Terracotta 测试联机逻辑。
-- 联机源码：Terracotta v0.4.2 源码已作为第三方源码包放入 [ThirdParty/Terracotta](ThirdParty/Terracotta)，当前 `terracotta.exe` 仅作为过渡后端保留。
+- 联机源码：Terracotta v0.4.2 源码已作为第三方源码包放入 [ThirdParty/Terracotta](ThirdParty/Terracotta)，PCL2 现在默认使用已移植到 VB/.NET 的内部联机实现，不再携带或启动 `terracotta.exe`。
 
 ## 构建
 
@@ -45,7 +45,7 @@ msbuild "Plain Craft Launcher 2.sln" /m /p:Configuration=Release /p:Platform="An
 - GitHub Actions、MSBuild、Visual Studio Build Tools、.NET SDK：用于 Windows Release 构建与产物验证。
 - ripgrep、Bash、Python zipfile：用于代码检索、脚本化检查和发布包整理。
 - ILSpy 与 .NET 反编译/分析工具链：用于阅读既有构建产物并对照恢复缺失逻辑。
-- Terracotta / EasyTier：为测试联机模式提供参考实现与底层联机能力；Terracotta 源码按 AGPL-3.0 随仓库公开。
+- Terracotta / EasyTier：为测试联机模式提供参考实现与底层联机能力；Terracotta 源码按 AGPL-3.0 随仓库公开，EasyTier 仍作为底层联机过渡资产随构建提供。
 - OpenAI Codex / Codex CLI：用于辅助代码阅读、修改、验证、提交和发布流程。
 - Newtonsoft.Json、NAudio、Ookii.Dialogs.Wpf、Imazen.WebP、CacheCow、ThrottleDebounce 等第三方库：为 PCL2 的数据处理、音频、对话框、图片、缓存和交互能力提供支持。
 

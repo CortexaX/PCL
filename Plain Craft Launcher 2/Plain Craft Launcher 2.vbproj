@@ -916,14 +916,6 @@
     <None Include="Resources\lwjgl-unsafe-agent.jar" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\Taowa\terracotta.exe">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <TargetPath>terracotta.exe</TargetPath>
-    </None>
-    <None Include="Resources\Taowa\VCRUNTIME140.DLL">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <TargetPath>VCRUNTIME140.DLL</TargetPath>
-    </None>
     <None Include="Resources\Taowa\EasyTier\easytier-core.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>Resources\Taowa\EasyTier\easytier-core.exe</TargetPath>

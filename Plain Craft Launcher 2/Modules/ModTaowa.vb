@@ -1,5 +1,3 @@
-Imports System.Text.RegularExpressions
-
 Public Module Pcl2Taowa
 
     Private ReadOnly Gate As New Object
@@ -11,8 +9,6 @@ Public Module Pcl2Taowa
         "tcp://43.139.242.231:11010"
     }
 
-    Private CoreProcess As Process = Nothing
-    Private CurrentApiPort As Integer = 0
     Private CachedPublicNodes As String() = Nothing
     Private NodesCachedAt As Date = Date.MinValue
     Private LastError As String = Nothing
@@ -21,22 +17,13 @@ Public Module Pcl2Taowa
 
     Public ReadOnly Property ApiPort As Integer
         Get
-            Return CurrentApiPort
-        End Get
-    End Property
-
-    Private ReadOnly Property UseInternalBackend As Boolean
-        Get
-            Return String.Equals(Environment.GetEnvironmentVariable("PCL_TAOWA_INTERNAL"), "1", StringComparison.OrdinalIgnoreCase)
+            Return 0
         End Get
     End Property
 
     Public ReadOnly Property IsRunning As Boolean
         Get
-            If UseInternalBackend Then Return InternalStarted
-            If CurrentApiPort > 0 AndAlso HttpAlive(CurrentApiPort) Then Return True
-            If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited Then Return CurrentApiPort > 0
-            Return False
+            Return InternalStarted
         End Get
     End Property
 
@@ -48,39 +35,6 @@ Public Module Pcl2Taowa
         }) With {.Timeout = TimeSpan.FromSeconds(25)}
     End Function
 
-    Private Sub StripProxyFromProcess(Info As ProcessStartInfo)
-        Try
-            For Each Key In {
-                "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
-                "http_proxy", "https_proxy", "all_proxy", "no_proxy",
-                "FTP_PROXY", "ftp_proxy", "SOCKS_PROXY", "socks_proxy"
-            }
-                Try
-                    If Info.EnvironmentVariables.ContainsKey(Key) Then Info.EnvironmentVariables.Remove(Key)
-                Catch
-                End Try
-            Next
-            Info.EnvironmentVariables("NO_PROXY") = "*"
-            Info.EnvironmentVariables("no_proxy") = "*"
-            Info.EnvironmentVariables("HTTP_PROXY") = ""
-            Info.EnvironmentVariables("HTTPS_PROXY") = ""
-            Info.EnvironmentVariables("ALL_PROXY") = ""
-            Info.EnvironmentVariables("http_proxy") = ""
-            Info.EnvironmentVariables("https_proxy") = ""
-            Info.EnvironmentVariables("all_proxy") = ""
-        Catch ex As Exception
-            Log("StripProxyFromProcess: " & ex.Message)
-        End Try
-    End Sub
-
-    Private Function HttpAlive(Port As Integer) As Boolean
-        Try
-            Return Http.GetAsync($"http://127.0.0.1:{Port}/state").GetAwaiter().GetResult().IsSuccessStatusCode
-        Catch
-            Return False
-        End Try
-    End Function
-
     Private Sub Log(Message As String)
         Try
             Dim LogFolder = Path.Combine(If(AppDomain.CurrentDomain.BaseDirectory, "."), "PCL")
@@ -89,21 +43,6 @@ Public Module Pcl2Taowa
         Catch
         End Try
     End Sub
-
-    Public Function FindExe() As String
-        Dim CandidateNames = {"terracotta.exe", "terracotta-0.4.2-windows-x86_64.exe"}
-        Dim CandidateFolders = {
-            If(AppDomain.CurrentDomain.BaseDirectory, "."),
-            Path.Combine(If(AppDomain.CurrentDomain.BaseDirectory, "."), "Resources", "Taowa")
-        }
-        For Each Folder In CandidateFolders
-            For Each Name In CandidateNames
-                Dim Candidate = Path.Combine(Folder, Name)
-                If File.Exists(Candidate) Then Return Candidate
-            Next
-        Next
-        Throw New FileNotFoundException("terracotta.exe not found next to Plain Craft Launcher 2.exe")
-    End Function
 
     Private Function NormalizeRoom(Room As String) As String
         If String.IsNullOrWhiteSpace(Room) Then Return ""
@@ -116,20 +55,6 @@ Public Module Pcl2Taowa
         Catch
         End Try
     End Sub
-
-    Private Function BuildPublicNodesQuery() As String
-        Dim Nodes = ResolvePublicNodes()
-        If Nodes Is Nothing OrElse Nodes.Length = 0 Then Return ""
-        Dim Builder As New StringBuilder
-        For Each Node In Nodes
-            If Not String.IsNullOrWhiteSpace(Node) Then
-                Builder.Append("&public_nodes=")
-                Builder.Append(Uri.EscapeDataString(Node.Trim()))
-            End If
-        Next
-        Log($"public_nodes count={Nodes.Length} {Nodes.Join(" | ")}")
-        Return Builder.ToString()
-    End Function
 
     Private Function ResolvePublicNodes() As String()
         If CachedPublicNodes IsNot Nothing AndAlso (Date.UtcNow - NodesCachedAt).TotalMinutes < 30 Then Return CachedPublicNodes
@@ -195,23 +120,9 @@ Public Module Pcl2Taowa
     Public Sub EnsureStarted()
         Try
             Log("EnsureStarted()")
-            If UseInternalBackend Then
+            SyncLock Gate
                 Pcl2TaowaInternal.EnsureInitialized()
                 InternalStarted = True
-                LastError = Nothing
-                Return
-            End If
-
-            SyncLock Gate
-                If CurrentApiPort > 0 AndAlso HttpAlive(CurrentApiPort) Then
-                    Log("reuse existing API port=" & CurrentApiPort)
-                    Return
-                End If
-                If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited AndAlso CurrentApiPort > 0 Then
-                    Log("reuse existing process pid=" & CoreProcess.Id)
-                    Return
-                End If
-                StartCoreLocked()
             End SyncLock
             LastError = Nothing
         Catch ex As Exception
@@ -226,79 +137,15 @@ Public Module Pcl2Taowa
         If Not IsRunning Then Throw New Exception(If(LastError, "陶瓦核心未启动（详见 PCL\TaowaBridge.log）"))
     End Sub
 
-    Private Sub StartCoreLocked()
-        If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited Then
-            Try
-                CoreProcess.Kill()
-            Catch
-            End Try
-        End If
-        CoreProcess = Nothing
-        CurrentApiPort = 0
-
-        ' Transitional backend: this launches the upstream Terracotta v0.4.2
-        ' binary whose source is vendored under ThirdParty\Terracotta.
-        ' The target is to replace this path with an in-process .NET port.
-        Dim ExePath = FindExe()
-        Dim PortFile = Path.Combine(Path.GetTempPath(), "pcl2-taowa-" & Guid.NewGuid().ToString("N"), "http")
-        DirectoryUtils.Create(Path.GetDirectoryName(PortFile))
-        Log($"start {ExePath} --hmcl {PortFile}")
-
-        CoreProcess = New Process With {
-            .StartInfo = New ProcessStartInfo With {
-                .FileName = ExePath,
-                .Arguments = $"--hmcl ""{PortFile}""",
-                .UseShellExecute = False,
-                .CreateNoWindow = True,
-                .WorkingDirectory = If(Path.GetDirectoryName(ExePath), ".")
-            }
-        }
-        StripProxyFromProcess(CoreProcess.StartInfo)
-        Log("start terracotta with proxy stripped")
-        If Not CoreProcess.Start() Then Throw New Exception("无法启动 terracotta 进程")
-
-        Dim Watch = Stopwatch.StartNew()
-        Do While Watch.Elapsed < TimeSpan.FromSeconds(30)
-            If File.Exists(PortFile) Then
-                Dim Raw = File.ReadAllText(PortFile, Encoding.UTF8)
-                Log("port file: " & Raw)
-                Dim Match = Regex.Match(Raw, """?port""?\s*:\s*(\d+)", RegexOptions.IgnoreCase)
-                If Not Match.Success Then Throw New Exception("端口解析失败: " & Raw)
-                CurrentApiPort = CInt(Match.Groups(1).Value)
-                Log("API port=" & CurrentApiPort)
-                Return
-            End If
-            If CoreProcess.HasExited Then Throw New Exception("terracotta 提前退出 code=" & CoreProcess.ExitCode)
-            Thread.Sleep(200)
-        Loop
-        Throw New TimeoutException("等待陶瓦 HTTP 端口超时")
-    End Sub
-
     Public Sub [Stop]()
         SyncLock Gate
-            If UseInternalBackend Then
-                Pcl2TaowaInternal.Reset()
-                InternalStarted = False
-                CurrentApiPort = 0
-                Return
-            End If
-
-            Try
-                If CoreProcess IsNot Nothing AndAlso Not CoreProcess.HasExited Then
-                    CoreProcess.Kill()
-                    CoreProcess.Dispose()
-                End If
-            Catch
-            End Try
-            CoreProcess = Nothing
-            CurrentApiPort = 0
+            Pcl2TaowaInternal.Reset()
+            InternalStarted = False
         End SyncLock
     End Sub
 
     Public Function GetStateRaw() As String
-        If UseInternalBackend Then Return Pcl2TaowaCore.GetStateRaw()
-        EnsureStarted()
-        Return Http.GetStringAsync($"http://127.0.0.1:{CurrentApiPort}/state").GetAwaiter().GetResult()
+        Return Pcl2TaowaCore.GetStateRaw()
     End Function
 
     Private Function StateLabel(State As String) As String
@@ -339,21 +186,8 @@ Public Module Pcl2Taowa
             Reset()
             Thread.Sleep(300)
 
-            If UseInternalBackend Then
-                Log("HOST internal")
-                Pcl2TaowaInternal.StartHost(PlayerName.Trim(), PublicNodes:=ResolvePublicNodes())
-            Else
-                Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/scanning?player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
-                Log("HOST " & Address)
-                Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
-                Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-                Log($"HOST resp {CInt(Response.StatusCode)} {Body}")
-                If Not Response.IsSuccessStatusCode Then
-                    Hint("创建房间失败：HTTP " & CInt(Response.StatusCode), HintType.Red)
-                    ShowInfoDialog("创建房间请求失败。" & vbCrLf & "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf & Body, "陶瓦联机 · 错误", True)
-                    Return
-                End If
-            End If
+            Log("HOST internal")
+            Pcl2TaowaInternal.StartHost(PlayerName.Trim(), PublicNodes:=ResolvePublicNodes())
 
             Hint("已开始扫描 · 已注入中继节点 · 请在 MC 对局域网开放", HintType.Green)
             Dim Room As String = Nothing
@@ -451,31 +285,14 @@ Public Module Pcl2Taowa
                 Log("Join pre-check: " & ex.Message)
             End Try
 
-            If UseInternalBackend Then
-                Log("JOIN internal")
-                If Not Pcl2TaowaInternal.StartGuest(Room, PlayerName.Trim(), PublicNodes:=ResolvePublicNodes()) Then
-                    RecoverToIdle()
-                    Hint("加入失败：房间码格式无效或当前状态不可加入", HintType.Red)
-                    ShowInfoDialog("加入房间请求失败。" & vbCrLf &
-                                   "请检查房间码是否完整、格式是否正确，或先重置当前联机状态。",
-                                   "陶瓦联机 · 错误", True)
-                    Return
-                End If
-            Else
-                Dim Address = $"http://127.0.0.1:{CurrentApiPort}/state/guesting?room={Uri.EscapeDataString(Room)}&player={Uri.EscapeDataString(PlayerName.Trim())}{BuildPublicNodesQuery()}"
-                Log("JOIN " & Address)
-                Dim Response = Http.GetAsync(Address).GetAwaiter().GetResult()
-                Dim Body = Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-                Log($"JOIN resp {CInt(Response.StatusCode)} {Body}")
-                If Not Response.IsSuccessStatusCode Then
-                    RecoverToIdle()
-                    Hint("加入失败：HTTP " & CInt(Response.StatusCode) & "（检查房间码）", HintType.Red)
-                    ShowInfoDialog("加入房间请求失败。" & vbCrLf &
-                                   "HTTP 状态码：" & CInt(Response.StatusCode) & vbCrLf &
-                                   "请检查房间码是否完整、格式是否正确。" & vbCrLf & vbCrLf & Body,
-                                   "陶瓦联机 · 错误", True)
-                    Return
-                End If
+            Log("JOIN internal")
+            If Not Pcl2TaowaInternal.StartGuest(Room, PlayerName.Trim(), PublicNodes:=ResolvePublicNodes()) Then
+                RecoverToIdle()
+                Hint("加入失败：房间码格式无效或当前状态不可加入", HintType.Red)
+                ShowInfoDialog("加入房间请求失败。" & vbCrLf &
+                               "请检查房间码是否完整、格式是否正确，或先重置当前联机状态。",
+                               "陶瓦联机 · 错误", True)
+                Return
             End If
 
             Hint("加入请求成功 · 等待地址…", HintType.Green)
@@ -516,7 +333,7 @@ Public Module Pcl2Taowa
                 Hint("加入未完成 · " & StateLabel(State), HintType.Red)
                 ShowInfoDialog("已发送加入请求，但直连地址尚未就绪。" & vbCrLf & vbCrLf &
                                "当前状态：" & StateLabel(State) & vbCrLf & vbCrLf &
-                               "请确认房主仍在线、房间码无误、本机防火墙未拦截 terracotta。" & vbCrLf & vbCrLf &
+                               "请确认房主仍在线、房间码无误、本机防火墙未拦截联机核心。" & vbCrLf & vbCrLf &
                                "原始状态：" & vbCrLf & SafeState(),
                                "陶瓦联机 · 等待连接", False)
             End If
@@ -530,15 +347,8 @@ Public Module Pcl2Taowa
 
     Public Sub Reset()
         Try
-            If UseInternalBackend Then
-                Pcl2TaowaInternal.Reset()
-                Log("reset internal idle")
-                Return
-            End If
-
-            EnsureStarted()
-            Http.GetAsync($"http://127.0.0.1:{CurrentApiPort}/state/ide").GetAwaiter().GetResult()
-            Log("reset idle")
+            Pcl2TaowaInternal.Reset()
+            Log("reset internal idle")
         Catch ex As Exception
             Log("reset fail " & ex.Message)
         End Try
