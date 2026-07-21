@@ -22,6 +22,15 @@ x86_64 release package:
 The same version also identifies itself in the PE metadata as Terracotta 0.4.2
 and embeds the string `Easytier: v2.5.0-terracotta.2`.
 
+The internal .NET path uses the same EasyTier version as a separately shipped
+transition asset under `Plain Craft Launcher 2/Resources/Taowa/EasyTier/`:
+
+| File | SHA256 |
+| --- | --- |
+| `easytier-core.exe` | `5371afc6432141813664bd8c50c682010a26c6c409d643960ed1a9fdda115bc7` |
+| `easytier-cli.exe` | `d7ff40af0e5c62f51ce9ac2b7682502e6cd0f3e7575972b72783325526283b7d` |
+| `Packet.dll` | `c7c03a87eac7243ccbe331554624b18803010b740e311fc8cfddb573096eacac` |
+
 ## Migration target
 
 The current PCL2 implementation uses these binaries as a temporary backend from

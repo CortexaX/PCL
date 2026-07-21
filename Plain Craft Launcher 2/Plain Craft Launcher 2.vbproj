@@ -924,6 +924,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>VCRUNTIME140.DLL</TargetPath>
     </None>
+    <None Include="Resources\Taowa\EasyTier\easytier-core.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Resources\Taowa\EasyTier\easytier-core.exe</TargetPath>
+    </None>
+    <None Include="Resources\Taowa\EasyTier\easytier-cli.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Resources\Taowa\EasyTier\easytier-cli.exe</TargetPath>
+    </None>
+    <None Include="Resources\Taowa\EasyTier\Packet.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>Resources\Taowa\EasyTier\Packet.dll</TargetPath>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MeloongCore\Shared\MeloongCore.csproj">
