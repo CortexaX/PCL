@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plain Craft Launcher 2 完全开源版</title>
+  <meta name="description" content="Plain Craft Launcher 2 完全开源版，源码、构建流程和发布产物公开可审计。">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <img class="hero-image" src="assets/pcl-cover.jpg" alt="Plain Craft Launcher 2 完全开源版">
+    <div class="hero-shade"></div>
+    <nav class="topbar" aria-label="主导航">
+      <a class="brand" href="https://github.com/CortexaX/PCL">PCL2 Open Source</a>
+      <div class="nav-links">
+        <a href="https://github.com/CortexaX/PCL/releases">下载</a>
+        <a href="https://github.com/CortexaX/PCL/actions">构建</a>
+        <a href="https://github.com/CortexaX/PCL">源码</a>
+      </div>
+    </nav>
+    <section class="hero-content">
+      <p class="eyebrow">Plain Craft Launcher 2</p>
+      <h1>完全开源版</h1>
+      <p class="summary">面向学习、研究、构建和二次开发的 PCL2 源码恢复与维护版本。源码、构建流程和发布产物保持公开、可审计、可复现。</p>
+      <div class="actions">
+        <a class="primary" href="https://github.com/CortexaX/PCL/releases">下载最新版</a>
+        <a class="secondary" href="https://github.com/CortexaX/PCL">查看源码</a>
+      </div>
+    </section>
+  </header>
+
+  <main>
+    <section class="section">
+      <h2>当前重点</h2>
+      <div class="feature-grid">
+        <article>
+          <h3>源码公开</h3>
+          <p>包含启动器主体、UI、动画、下载、Minecraft 启动、资源管理、PCLCS 与 MeloongCore 等代码。</p>
+        </article>
+        <article>
+          <h3>构建公开</h3>
+          <p>使用 GitHub Actions 在 Windows 环境中执行 Release 构建，并上传可下载产物。</p>
+        </article>
+        <article>
+          <h3>联机内部化</h3>
+          <p>PCL2 默认使用已移植到 VB/.NET 的内部 Taowa 联机实现，不再携带或启动 terracotta.exe。</p>
+        </article>
+        <article>
+          <h3>主题恢复</h3>
+          <p>已恢复主题解锁与原版主题调色逻辑，便于独立使用与继续维护。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section split">
+      <div>
+        <h2>版本分支</h2>
+        <p>主分支用于继续维护完全开源正式版，参考分支保留旧正式版和 Taowa 测试版快照，方便对照恢复过程和行为差异。</p>
+      </div>
+      <div class="branch-list">
+        <a href="https://github.com/CortexaX/PCL/tree/main">main</a>
+        <a href="https://github.com/CortexaX/PCL/tree/reference/v2.13.0.1-cortexa.1">reference/v2.13.0.1-cortexa.1</a>
+        <a href="https://github.com/CortexaX/PCL/tree/reference/v2.13.0.1-taowa-test.1">reference/v2.13.0.1-taowa-test.1</a>
+        <a href="https://github.com/CortexaX/PCL/tree/reference/v2.13.0.1-taowa-test.2">reference/v2.13.0.1-taowa-test.2</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>本仓库不是官方 PCL2 项目。Plain Craft Launcher、PCL、PCL2 等名称及相关权益归原作者与对应权利人所有。</p>
+  </footer>
+</body>
+</html>

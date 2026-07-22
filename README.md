@@ -1,10 +1,17 @@
 # Plain Craft Launcher 2 完全开源版
 
 [![Build](https://github.com/CortexaX/PCL/actions/workflows/build.yml/badge.svg)](https://github.com/CortexaX/PCL/actions/workflows/build.yml)
+[![Pages](https://github.com/CortexaX/PCL/actions/workflows/pages.yml/badge.svg)](https://github.com/CortexaX/PCL/actions/workflows/pages.yml)
 [![Release](https://img.shields.io/github/v/release/CortexaX/PCL?label=Release)](https://github.com/CortexaX/PCL/releases)
 [![Stars](https://img.shields.io/github/stars/CortexaX/PCL?style=flat&label=Stars)](https://github.com/CortexaX/PCL)
 
+<p align="center">
+  <img src="docs/assets/pcl-cover.jpg" alt="Plain Craft Launcher 2 完全开源版" width="760">
+</p>
+
 这是一个第三方基于 Plain Craft Launcher 2 整理、恢复和维护的完全开源版本。项目目标是让 PCL2 的源码、构建流程和发布产物都保持公开、可审计、可复现，方便学习、研究、构建和二次开发。
+
+项目网页：https://cortexax.github.io/PCL/
 
 本仓库不是官方 PCL2 项目，不代表原作者或官方社区立场。Plain Craft Launcher、PCL、PCL2 等名称及相关权益归原作者与对应权利人所有。具体使用、分发和二次创作规则请以仓库中的 [LICENCE](LICENCE) 以及各第三方组件许可证为准。
 
