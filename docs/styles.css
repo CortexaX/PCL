@@ -170,6 +170,11 @@ article {
   border-radius: 8px;
 }
 
+.acknowledgement {
+  min-height: auto;
+  background: var(--panel-strong);
+}
+
 article h3 {
   margin-bottom: 12px;
   font-size: 20px;
