@@ -51,9 +51,7 @@ msbuild "Plain Craft Launcher 2.sln" /m /p:Configuration=Release /p:Platform="An
 
 ## 致谢
 
-感谢尹海航，PCL2 原项目作者。
-
-感谢原作者龙腾猫跃（LTCat）创建并长期维护 Plain Craft Launcher 2。PCL2 的界面、交互、启动流程、下载能力和大量工程实现都来自原作者与社区长期积累，本仓库的恢复与维护工作建立在这些基础之上。
+感谢尹海航（龙腾猫跃 / LTCat）创建并长期维护 Plain Craft Launcher 2。PCL2 的界面、交互、启动流程、下载能力和大量工程实现都来自原作者与社区长期积累，本仓库的恢复与维护工作建立在这些基础之上。
 
 感谢 PCL2 社区、问题反馈者、贡献者和文档维护者。没有这些长期沉淀，很多功能行为和边界都很难准确还原。
 
